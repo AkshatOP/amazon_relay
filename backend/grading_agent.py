@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import time
 from functools import lru_cache
 from pathlib import Path
 
@@ -72,17 +73,22 @@ def _build_contents(
     contents.append(
         f"Product category: {category}.\n"
         f"The first group of {len(reference_image_paths)} image(s) below are the "
-        f"REFERENCE images — the GOOD product (what it should look like).\n"
-        f"--- REFERENCE (GOOD) IMAGES ---"
+        f"REFERENCE images — a catalog/marketing photo, for DESIGN CONTEXT ONLY. Use them "
+        f"only to understand the product and which functional parts it should have. They are "
+        f"a studio shot and may differ from the returned unit in colour, angle, lighting, and "
+        f"background; those differences are NOT defects and must be ignored.\n"
+        f"--- REFERENCE (CATALOG, CONTEXT ONLY) IMAGES ---"
     )
     for p in reference_image_paths:
         contents.append(_image_part(p))
 
     contents.append(
         f"The next group of {len(inspection_image_paths)} image(s) are the INSPECTION "
-        f"images — the RETURNED product captured by the rider. Grade the condition "
-        f"delta of this returned item versus the reference above.\n"
-        f"--- INSPECTION (RETURNED) IMAGES ---"
+        f"images — the ACTUAL RETURNED product, captured by the rider. This returned item is "
+        f"the ONLY thing you grade. Inspect it for real physical damage and broken functional "
+        f"parts (especially zippers/chains, buckles, straps, seams). Do NOT grade it down for "
+        f"looking different from the catalog photo.\n"
+        f"--- INSPECTION (RETURNED ITEM — GRADE THIS) IMAGES ---"
     )
     for p in inspection_image_paths:
         contents.append(_image_part(p))
@@ -128,18 +134,41 @@ def _parse_and_validate(text: str) -> dict | None:
         return None
 
 
-def _call_gemini(contents: list) -> str:
-    """Single Gemini call returning raw text. Raises on API errors."""
+_TRANSIENT_MARKERS = ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "timeout", "deadline")
+
+
+def _is_transient(err: Exception) -> bool:
+    msg = str(err).lower()
+    return any(m.lower() in msg for m in _TRANSIENT_MARKERS)
+
+
+def _call_gemini(contents: list, max_retries: int = 3) -> str:
+    """Single Gemini call returning raw text.
+
+    Retries transient API errors (503 high-demand, 429 rate limit, timeouts) with simple
+    backoff so a momentary spike doesn't break a live demo. Raises on non-transient errors
+    or once retries are exhausted.
+    """
     client = _client()
-    resp = client.models.generate_content(
-        model=config.GEMINI_MODEL,
-        config=types.GenerateContentConfig(
-            system_instruction=_load_skill(),
-            response_mime_type="application/json",
-        ),
-        contents=contents,
-    )
-    return resp.text or ""
+    last_err: Exception | None = None
+    for attempt in range(max_retries):
+        try:
+            resp = client.models.generate_content(
+                model=config.GEMINI_MODEL,
+                config=types.GenerateContentConfig(
+                    system_instruction=_load_skill(),
+                    response_mime_type="application/json",
+                ),
+                contents=contents,
+            )
+            return resp.text or ""
+        except Exception as e:
+            last_err = e
+            if _is_transient(e) and attempt < max_retries - 1:
+                time.sleep(2 * (attempt + 1))  # 2s, 4s backoff
+                continue
+            raise
+    raise last_err  # pragma: no cover - loop always returns or raises above
 
 
 def grade_visual(
