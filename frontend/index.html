@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Amazon Relay — Condition Grading Agent (MVP)</title>
+  <style>
+    /* Minimal styling — the demo only has to function. */
+    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 24px auto; padding: 0 16px; line-height: 1.4; }
+    h1 { margin-bottom: 0; }
+    .sub { color: #555; margin-top: 4px; }
+    fieldset { margin: 16px 0; }
+    label { display: block; margin: 8px 0 4px; font-weight: bold; }
+    .hint { font-weight: normal; color: #777; font-size: 0.85em; }
+    button { padding: 8px 16px; font-size: 1em; cursor: pointer; }
+    pre { background: #111; color: #0f0; padding: 12px; overflow-x: auto; white-space: pre-wrap; }
+    .summary { background: #f4f4f4; padding: 10px; border-left: 4px solid #888; }
+    .grade-A,.grade-B { border-left-color: #2a8; }
+    .grade-C { border-left-color: #e90; }
+    .grade-D,.grade-ERROR { border-left-color: #c33; }
+    .err { color: #c33; }
+    hr { margin: 32px 0; }
+    /* Drag-and-drop zones */
+    .dropzone { border: 2px dashed #aaa; border-radius: 8px; padding: 18px; text-align: center;
+      color: #666; background: #fafafa; cursor: pointer; transition: background .15s, border-color .15s; }
+    .dropzone.dragover { border-color: #2a8; background: #eafaf2; color: #186; }
+    .dropzone input[type=file] { display: none; }
+    .dz-prompt { font-size: 0.9em; }
+    .dz-files { margin-top: 8px; font-size: 0.85em; color: #333; text-align: left; }
+    .dz-files ul { margin: 4px 0 0; padding-left: 18px; }
+    .dz-clear { font-size: 0.8em; color: #c33; cursor: pointer; text-decoration: underline; margin-left: 8px; }
+  </style>
+</head>
+<body>
+  <h1>Amazon Relay</h1>
+  <p class="sub">Condition Grading Agent — MVP demo. Grades the <b>condition delta</b> between
+  a good (reference) product and a returned product using a Gemini VLM.</p>
+
+  <!-- ========================= VISUAL PATH (hero) ========================= -->
+  <h2>Visual grading (hero path)</h2>
+
+  <label for="category">Product category
+    <span class="hint">In production this is auto-detected from order history; for the demo, pick manually.</span>
+  </label>
+  <select id="category"></select>
+
+  <fieldset>
+    <legend>Container 1 — Good product (reference) images</legend>
+    <p class="hint">The known-good product. In production these are auto-pulled from the Amazon catalog by SKU.</p>
+    <div class="dropzone" id="dz_reference" data-input="reference_images">
+      <div class="dz-prompt">Drag &amp; drop image(s) here, or click to browse</div>
+      <input type="file" id="reference_images" accept="image/*" multiple />
+      <div class="dz-files" id="files_reference"></div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Container 2 — Returned product images (captured by rider for AI inspection)</legend>
+    <p class="hint">Photos of the returned item to be graded.</p>
+    <div class="dropzone" id="dz_inspection" data-input="inspection_images">
+      <div class="dz-prompt">Drag &amp; drop image(s) here, or click to browse</div>
+      <input type="file" id="inspection_images" accept="image/*" multiple />
+      <div class="dz-files" id="files_inspection"></div>
+    </div>
+  </fieldset>
+
+  <button id="gradeBtn" onclick="gradeVisual()">Grade it</button>
+  <span id="status"></span>
+
+  <h3>Result</h3>
+  <div id="summary" class="summary" style="display:none"></div>
+  <p class="hint">Raw JSON returned by the agent (the demo money-shot — verbatim):</p>
+  <pre id="output">(no result yet)</pre>
+
+  <hr />
+
+  <!-- ===================== FUNCTIONAL PATH (Phase 2) ===================== -->
+  <h2>Functional grading (stub — for chargers, speakers, etc.)</h2>
+  <p class="hint">For products where a photo is useless. Answer the yes/no checks (checked = yes / passes).</p>
+  <label><input type="checkbox" class="fq" checked /> Powers on / charges?</label>
+  <label><input type="checkbox" class="fq" checked /> Connectors intact (no fraying/bent pins)?</label>
+  <label><input type="checkbox" class="fq" checked /> Output stable under load?</label>
+  <button onclick="gradeFunctional()">Grade functionally</button>
+  <pre id="output_func">(no result yet)</pre>
+
+  <script>
+    // Visual categories for the dropdown (key -> label).
+    const VISUAL_CATEGORIES = {
+      "shoes": "Footwear / Shoes",
+      "clothing": "Clothing",
+      "phone_case": "Phone Case",
+      "bag": "Bag / Backpack",
+      "watch": "Watch",
+      "baby_gear": "Baby Gear",
+      "toy": "Toy",
+      "book": "Book"
+    };
+
+    // Populate dropdown.
+    const sel = document.getElementById("category");
+    for (const [val, label] of Object.entries(VISUAL_CATEGORIES)) {
+      const o = document.createElement("option");
+      o.value = val; o.textContent = label;
+      sel.appendChild(o);
+    }
+
+    // ---- Drag & drop wiring (one or multiple files) ----
+    function setupDropzone(zoneId, inputId, listId) {
+      const zone = document.getElementById(zoneId);
+      const input = document.getElementById(inputId);
+      const list = document.getElementById(listId);
+
+      // Click anywhere in the zone opens the file picker.
+      zone.addEventListener("click", (e) => {
+        if (e.target.classList.contains("dz-clear")) return; // don't reopen on "clear"
+        input.click();
+      });
+
+      // Merge a FileList/array of files into the input via DataTransfer, de-duping by name+size.
+      function addFiles(newFiles) {
+        const dt = new DataTransfer();
+        const seen = new Set();
+        const add = (f) => {
+          const key = f.name + ":" + f.size;
+          if (!seen.has(key)) { seen.add(key); dt.items.add(f); }
+        };
+        for (const f of input.files) add(f);
+        for (const f of newFiles) if (f.type.startsWith("image/")) add(f);
+        input.files = dt.files;
+        renderList();
+      }
+
+      function renderList() {
+        if (input.files.length === 0) { list.innerHTML = ""; return; }
+        const names = Array.from(input.files).map(f => "<li>" + f.name + "</li>").join("");
+        list.innerHTML = "<b>" + input.files.length + " file(s):</b>" +
+          "<span class='dz-clear'>clear</span><ul>" + names + "</ul>";
+      }
+
+      // Picking via the native dialog should also refresh the list.
+      input.addEventListener("change", renderList);
+
+      // Clear button.
+      list.addEventListener("click", (e) => {
+        if (e.target.classList.contains("dz-clear")) {
+          input.value = "";
+          renderList();
+        }
+      });
+
+      // Drag events.
+      ["dragenter", "dragover"].forEach(ev =>
+        zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.add("dragover"); }));
+      ["dragleave", "dragend", "drop"].forEach(ev =>
+        zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.remove("dragover"); }));
+      zone.addEventListener("drop", (e) => {
+        if (e.dataTransfer && e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+      });
+    }
+
+    setupDropzone("dz_reference", "reference_images", "files_reference");
+    setupDropzone("dz_inspection", "inspection_images", "files_inspection");
+
+    async function gradeVisual() {
+      const status = document.getElementById("status");
+      const out = document.getElementById("output");
+      const summary = document.getElementById("summary");
+      const btn = document.getElementById("gradeBtn");
+
+      const refFiles = document.getElementById("reference_images").files;
+      const inspFiles = document.getElementById("inspection_images").files;
+
+      summary.style.display = "none";
+      if (inspFiles.length === 0) {
+        status.innerHTML = '<span class="err"> Please add at least one inspection (returned) image.</span>';
+        return;
+      }
+
+      const fd = new FormData();
+      fd.append("category", sel.value);
+      for (const f of refFiles) fd.append("reference_images", f);
+      for (const f of inspFiles) fd.append("inspection_images", f);
+
+      btn.disabled = true;
+      status.textContent = " grading…";
+      out.textContent = "…";
+
+      try {
+        const res = await fetch("/grade", { method: "POST", body: fd });
+        const data = await res.json();
+        out.textContent = JSON.stringify(data, null, 2);
+        renderSummary(summary, data);
+        status.textContent = "";
+      } catch (e) {
+        status.innerHTML = '<span class="err"> Request failed: ' + e + '</span>';
+        out.textContent = "(error)";
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function renderSummary(el, data) {
+      el.style.display = "block";
+      el.className = "summary grade-" + (data.grade || "ERROR");
+      const defects = (data.defects && data.defects.length) ? data.defects.join(", ") : "none";
+      el.innerHTML =
+        "<b>Grade " + data.grade + "</b> (score " + data.score +
+        ", confidence " + data.confidence + ")<br/>" +
+        "Defects: " + defects + "<br/>" +
+        "Resale eligible: " + data.resale_eligible +
+        " · Refurbish recommended: " + data.refurbish_recommended + "<br/>" +
+        "<i>" + (data.notes || "") + "</i>";
+    }
+
+    async function gradeFunctional() {
+      const out = document.getElementById("output_func");
+      const answers = Array.from(document.querySelectorAll(".fq")).map(c => c.checked);
+      out.textContent = "…";
+      try {
+        const res = await fetch("/grade/functional", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ category: "charger", answers })
+        });
+        const data = await res.json();
+        out.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        out.textContent = "Request failed: " + e;
+      }
+    }
+  </script>
+</body>
+</html>
