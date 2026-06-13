@@ -37,7 +37,8 @@ The agent is given:
 - **inspection photos** of the returned product (captured by the delivery rider who
   collects the return),
 
-and it grades the **condition delta** between them visually.
+and it inspects the **returned item for real damage and defects**, using the reference only
+as design context for what the product is and which parts it should have.
 
 ### Functional path (stubbed in this MVP)
 For products where a photo is useless — chargers, speakers, power banks. Graded by rule
@@ -50,16 +51,24 @@ In this MVP the user/demo uploads the reference (good-product) photos manually.
 
 **In production this is automated:** the reference image is auto-pulled from the Amazon
 catalog via the order-history SKU, so the customer/rider provides only the **inspection
-photos**. The visual delta-grading approach is unchanged — only the source of the
-reference image differs. We surface the reference upload in the demo purely so judges can
-see and control both halves of the comparison.
+photos**. The grading approach is unchanged — only the source of the reference image
+differs. We surface the reference upload in the demo purely so judges can see and control
+both inputs.
 
-## Why grade the *delta*, not the absolute condition
+## How the reference is used (important nuance)
 
-A photo of a product in isolation can't tell "this scuff shipped from the factory" from
-"this scuff is new damage." By comparing inspection photos against the known-good reference,
-the agent measures only what *changed* — which is exactly what determines resale value and
-the correct downstream route.
+The reference is **design context only — not a pixel-comparison target.** A catalog photo is
+a studio shot and an inspection photo is a casual phone photo, so they will *always* differ in
+colour, angle, lighting, and background. The agent is explicitly told these differences are
+**not** defects, and it must **never** grade an item down for "not looking like the catalog
+photo." It grades only genuine physical damage visible on the returned unit itself.
+
+What the agent prioritises (learned from real test cases):
+1. **Functional / closure components first** — zippers/chains, buckles, straps, seams. A
+   broken zipper is the #1 return reason and **blocks resale even if the item looks spotless**
+   (reselling it just triggers another return).
+2. **Surface marks, stains & uneven/localised fading** — judged by comparing one area of the
+   returned item to another area of the *same* item, not to the reference's colour.
 
 ## Output contract
 

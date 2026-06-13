@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Amazon Relay — Smart Geo-Routing (Phase 3)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 860px; margin: 24px auto; padding: 0 16px; line-height: 1.45; }
+    h1 { margin-bottom: 0; } .sub { color: #555; margin-top: 4px; }
+    fieldset { margin: 14px 0; } label { display: block; margin: 8px 0 3px; font-weight: bold; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; } .row > div { flex: 1; min-width: 200px; }
+    input, select { width: 100%; padding: 6px; box-sizing: border-box; }
+    button { padding: 10px 20px; font-size: 1em; cursor: pointer; margin-top: 8px; }
+    .badge { display: inline-block; padding: 6px 14px; border-radius: 6px; color: #fff; font-weight: bold; font-size: 1.2em; }
+    .RESELL_LOCAL { background: #1a8f4c; } .REFURBISH { background: #c77f0a; }
+    .DONATE { background: #2a6db0; } .LIQUIDATE { background: #b03a2e; } .ERROR { background:#777; }
+    table { border-collapse: collapse; margin: 8px 0; width: 100%; }
+    td, th { border: 1px solid #ccc; padding: 5px 9px; text-align: left; font-size: 0.92em; }
+    .moneyshot { background: #0b132b; color: #e0fbfc; padding: 16px; border-radius: 8px; margin: 14px 0; }
+    .moneyshot .big { font-size: 1.5em; font-weight: bold; }
+    .savings { color: #7CFC9B; } .muted { color: #9bb; font-size: 0.85em; }
+    pre { background: #111; color: #0f0; padding: 12px; overflow-x: auto; white-space: pre-wrap; font-size: 0.8em; }
+    .pill { font-size: 0.8em; padding: 2px 8px; border-radius: 10px; background: #eee; }
+    #status { color:#c33; } .explain { background:#f4f7f4; border-left: 4px solid #1a8f4c; padding: 10px; }
+    .no-buyer { background:#1a1a2e; color:#aaa; padding:12px; border-radius:8px; margin:14px 0; font-size:0.95em; }
+  </style>
+</head>
+<body>
+  <h1>Amazon Relay — Smart Geo-Routing</h1>
+  <p class="sub">Phase 3. Takes a graded return and decides:
+    <b>RESELL_LOCAL / REFURBISH / DONATE / LIQUIDATE</b> using geography + economics + XGBoost.
+    Returns are treated as <b>new units at full price</b> — routing is logistics arbitrage.
+    Calls the routing API on <code>:8100</code>.</p>
+
+  <fieldset>
+    <legend>Returned item</legend>
+    <div class="row">
+      <div><label>Category</label>
+        <select id="category">
+          <option>footwear</option><option>shoes</option><option>watch</option>
+          <option>phonecase</option><option>toy</option><option>book</option>
+          <option selected>backpack</option><option>bag</option>
+        </select>
+      </div>
+      <div><label>ASIN (for demand match)</label><input id="asin" value="B0BP001" /></div>
+      <div><label>Original price (Rs)</label><input id="original_price" type="number" value="3000" /></div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Grade (from Phase-1 grading agent — edit to simulate)</legend>
+    <div class="row">
+      <div><label>Grade</label>
+        <select id="grade"><option>A</option><option>B</option><option selected>A</option><option>C</option><option>D</option></select>
+      </div>
+      <div><label>Score (1-10)</label><input id="score" type="number" value="9" /></div>
+      <div><label>Defect count</label><input id="defect_count" type="number" value="0" /></div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Return item pickup location (used to find nearest RCC → FC route)</legend>
+    <p style="margin:4px 0 8px;color:#555;font-size:0.9em">
+      Enter where the item will be picked up (customer's address). Distances are computed via
+      <b>OSRM road routing</b> (real road path, not straight-line).
+      For Bengaluru: lat ≈ 12.9x, lng ≈ 77.5x. <b>Common mistake: do not enter a latitude value in the lng field.</b>
+    </p>
+    <div class="row">
+      <div>
+        <label>Latitude <span style="font-weight:normal;color:#888">(e.g. 12.9166)</span></label>
+        <input id="lat" value="12.9166" oninput="warnCoords()" />
+      </div>
+      <div>
+        <label>Longitude <span style="font-weight:normal;color:#888">(e.g. 77.6101 — must be ~77 for Bengaluru)</span></label>
+        <input id="lng" value="77.6101" oninput="warnCoords()" />
+      </div>
+      <div style="flex:2">
+        <label>Presets</label>
+        <select id="preset" onchange="applyPreset(this)">
+          <option value="12.9166,77.6101">BTM 1st Stage</option>
+          <option value="12.9784,77.6408">Indira Nagar</option>
+          <option value="12.9456,77.5236">Mysore Road</option>
+          <option value="12.8911,77.5970">Bannerghatta Road</option>
+          <option value="12.9719,77.6076">Brigade Road</option>
+        </select>
+      </div>
+    </div>
+    <div id="coord-warn" style="color:#c33;font-size:0.88em;margin-top:4px;display:none">
+      ⚠ Longitude looks wrong for Bengaluru (expected ~77.x). Road distances will be huge.
+      Did you accidentally enter a latitude in the longitude field?
+    </div>
+  </fieldset>
+
+  <button onclick="route()">Route this return →</button>
+  <span id="status"></span>
+
+  <div id="result" style="display:none">
+    <h2>Decision: <span id="badge" class="badge"></span> <span id="decidedby" class="pill"></span></h2>
+    <div class="explain" id="explain"></div>
+
+    <div id="moneyshot"></div>
+
+    <h3>Why (4-way model scores)</h3>
+    <table id="scores"></table>
+
+    <h3>Geography &amp; economics</h3>
+    <table id="geoecon"></table>
+
+    <h3>Raw routing JSON</h3>
+    <pre id="raw"></pre>
+  </div>
+
+  <script>
+    const API = "http://localhost:8100";
+
+    function applyPreset(sel) {
+      const [la, ln] = sel.value.split(",");
+      document.getElementById("lat").value = la;
+      document.getElementById("lng").value = ln;
+      warnCoords();
+    }
+
+    function warnCoords() {
+      const lng = parseFloat(document.getElementById("lng").value);
+      const warn = document.getElementById("coord-warn");
+      // Bengaluru longitude is ~77.x. Warn if outside [60, 100] (all of India).
+      warn.style.display = (isNaN(lng) || lng < 60 || lng > 100) ? "block" : "none";
+    }
+
+    function val(id) { return document.getElementById(id).value; }
+
+    async function route() {
+      const status = document.getElementById("status");
+      status.textContent = " routing…";
+      const grade = val("grade");
+      const grade_json = {
+        grade: grade,
+        score: Number(val("score")),
+        confidence: 0.9,
+        defects: Array.from({length: Number(val("defect_count"))}, (_, i) => "defect " + (i+1)),
+        resale_eligible: (grade === "A" || grade === "B"),
+        refurbish_recommended: (grade === "C"),
+      };
+      const order_meta = {
+        order_id: "ORD-DEMO", asin: val("asin"), product_name: "Demo " + val("category"),
+        category: val("category"), original_price: Number(val("original_price")),
+        customer_lat: Number(val("lat")), customer_lng: Number(val("lng")),
+      };
+      try {
+        const res = await fetch(API + "/route", {
+          method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ grade_json, order_meta }),
+        });
+        const data = await res.json();
+        render(data);
+        status.textContent = "";
+      } catch (e) {
+        status.textContent = " ERROR: " + e + " (is the routing API running on :8100?)";
+      }
+    }
+
+    function rs(v) { return v != null ? "Rs " + v : "n/a"; }
+    function kg(v) { return v != null ? v + " kg" : "n/a"; }
+
+    function render(d) {
+      document.getElementById("result").style.display = "block";
+      const badge = document.getElementById("badge");
+      badge.textContent = d.decision; badge.className = "badge " + d.decision;
+      document.getElementById("decidedby").textContent = "decided by: " + d.decided_by
+        + " (conf " + d.confidence + ")";
+      document.getElementById("explain").textContent = d.explanation || d.reason;
+
+      // Money-shot
+      const econ = d.economics, match = d.match, geo = d.geography;
+      const ms = document.getElementById("moneyshot");
+
+      if (d.decision === "RESELL_LOCAL" && match.buyer_found && econ.tier3_projection) {
+        const t3 = econ.tier3_projection;
+        ms.className = "moneyshot";
+        ms.innerHTML =
+          '<div class="big">Intercept <span class="savings">' + match.buyer_distance_km
+          + ' km</span> local vs haul <span class="savings">' + geo.fc_distance_km
+          + ' km</span> to FC + reship same distance back</div>'
+          + '<div style="margin-top:8px">Tier-3 impact (FC ~' + t3.warehouse_km + ' km away — both haul AND reship deleted): '
+          + '<b class="savings">Rs ' + t3.savings_inr + '/item</b> saved · '
+          + '<b class="savings">' + t3.co2_saved_kg + ' kg CO₂/item</b> avoided</div>'
+          + '<div class="muted" style="margin-top:6px">This metro run (FC ' + geo.fc_distance_km
+          + ' km): Rs ' + econ.savings_inr + '/item saved, ' + econ.co2_saved_kg
+          + ' kg CO₂ — smaller but honest. Buyer: pin ' + match.buyer_pincode
+          + ' (' + match.buyer_distance_km + ' km).</div>';
+      } else if (d.decision === "RESELL_LOCAL" && match.buyer_found) {
+        ms.className = "moneyshot";
+        ms.innerHTML =
+          '<div class="big">RESELL_LOCAL — buyer ' + match.buyer_distance_km + ' km away</div>'
+          + '<div>Saved: <b class="savings">Rs ' + econ.savings_inr + '</b> · '
+          + '<b class="savings">' + econ.co2_saved_kg + ' kg CO₂</b></div>';
+      } else {
+        // Non-RESELL_LOCAL outcome: show why intercept didn't fire
+        ms.className = "no-buyer";
+        const nobuyer = !match.buyer_found
+          ? "No pending buyer found within " + econ.warehouse_equivalent_km + " km of the RCC."
+          : (econ.savings_inr <= 0 ? "Local intercept doesn't save money vs FC haul here." : "");
+        ms.innerHTML = '<b>' + d.decision + '</b> — ' + nobuyer
+          + ' Full reverse-haul cost: Rs ' + econ.full_path_cost + '/item.'
+          + (d.decision === "REFURBISH" ? ' Item will be restocked from FC for a future order.' : '');
+      }
+
+      // Scores table
+      let st = "<tr><th>Outcome</th><th>Score</th></tr>";
+      for (const k of ["RESELL_LOCAL","REFURBISH","DONATE","LIQUIDATE"]) {
+        const v = d.scores[k] ?? 0;
+        st += "<tr><td>" + k + "</td><td>" + v + (k===d.decision ? " ◄" : "") + "</td></tr>";
+      }
+      document.getElementById("scores").innerHTML = st;
+
+      // Geo + econ table
+      const distNote = " <span style='color:#888;font-size:0.85em'>(road km via OSRM)</span>";
+      document.getElementById("geoecon").innerHTML =
+        "<tr><th>Pickup → Nearest RCC</th><td>" + geo.nearest_rcc + " — " + geo.rcc_distance_km + " km" + distNote + "</td></tr>"
+        + "<tr><th>RCC → Nearest FC</th><td>" + geo.nearest_fc + " — " + geo.fc_distance_km + " km" + distNote + "</td></tr>"
+        + "<tr><th>Buyer found</th><td>" + match.buyer_found
+          + (match.buyer_found ? " — " + match.buyer_distance_km + " km (pin " + match.buyer_pincode + ")" : "") + "</td></tr>"
+        + "<tr><th>Original price (full, treated as new)</th><td>Rs " + econ.original_price + "</td></tr>"
+        + "<tr><th>Full-path cost (haul + reship)</th><td>" + rs(econ.full_path_cost) + "/item</td></tr>"
+        + "<tr><th>Local-intercept cost</th><td>" + (econ.local_intercept_cost != null ? rs(econ.local_intercept_cost) + "/item" : "n/a — no buyer") + "</td></tr>"
+        + "<tr><th>Savings if intercept</th><td><b>" + rs(econ.savings_inr) + "/item</b></td></tr>"
+        + "<tr><th>CO₂ (full path)</th><td>" + kg(econ.co2_full_kg) + "/item</td></tr>"
+        + "<tr><th>CO₂ saved</th><td>" + kg(econ.co2_saved_kg) + "/item</td></tr>";
+
+      document.getElementById("raw").textContent = JSON.stringify(d, null, 2);
+    }
+  </script>
+</body>
+</html>
