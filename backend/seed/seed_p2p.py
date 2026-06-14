@@ -1,27 +1,18 @@
-"""Seed the P2P relay_p2p.db database.
-
-Creates tables and inserts demo data for the Phase 5 hackathon demo.
+"""Seed the p2p tables (users, purchases, listings, p2p_demand, transactions) into relay.db.
 
 Demo scenario:
   - User: Priya Shetty (Udupi), has a baby monitor (₹6,000) purchased today
   - simulate_years=2.0 → age_factor=1.0 (peak window), grade B → ₹3,900 + ₹360 warranty = ₹4,260
-  - Demand: Demo Buyer in Manipal (~2.2 km away)
+  - Demand: a known buyer in Manipal (~7 km away)
 
-Run: python -m p2p.db.seed_p2p
+Run: python -m backend.seed.seed_p2p
 """
 from __future__ import annotations
 
 import datetime
-import sqlite3
-import sys
-from pathlib import Path
 
-# Allow running as __main__ without package context
-_repo_root = Path(__file__).resolve().parents[3]
-if str(_repo_root) not in sys.path:
-    sys.path.insert(0, str(_repo_root))
-
-from p2p.config import P2P_DB_PATH
+from backend.core import db as core_db
+from backend.core.config import DB_PATH
 
 
 DDL = """
@@ -95,9 +86,6 @@ CREATE TABLE IF NOT EXISTS transactions (
     asking_price REAL,
     platform_fee REAL,
     seller_payout REAL,
-    green_credits_rs REAL,
-    co2_saved_kg REAL,
-    total_p2p_km REAL,
     status TEXT DEFAULT 'pending',
     created_at TEXT DEFAULT (datetime('now'))
 );
@@ -136,11 +124,8 @@ DEMAND = [
 ]
 
 
-def seed(db_path=None):
-    path = db_path or P2P_DB_PATH
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    conn = sqlite3.connect(str(path))
+def seed():
+    conn = core_db.get_connection(row_factory=False)
     conn.executescript(DDL)
     conn.commit()
 
@@ -171,7 +156,7 @@ def seed(db_path=None):
 
     conn.commit()
     conn.close()
-    print(f"Seeded P2P DB at {path}")
+    print(f"Seeded P2P tables in {DB_PATH}")
     print(f"  {len(USERS)} users, {len(PURCHASES)} purchases, {len(DEMAND)} demand rows")
 
 

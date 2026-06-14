@@ -1,29 +1,30 @@
-"""Amazon Relay — FastAPI app.
+"""Amazon Relay — THE single FastAPI app.
 
-Serves the demo UI and exposes the grading endpoints. Run from the project root:
+One app, one port. Mounts every domain's APIRouter:
+  grading  → POST /grade, POST /grade/functional
+  routing  → POST /route, POST /grade-and-route
+  p2p      → GET/POST /p2p/*
 
+Run from the repo root:
     uvicorn backend.main:app --reload
+
+Swagger (/docs) covers every endpoint across all three domains.
 """
 from __future__ import annotations
 
-import shutil
-import tempfile
-from pathlib import Path
-from typing import List
-
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
-from . import config
-from .category_map import get_path
-from .functional_grader import grade_functional
-from .grading_agent import grade_visual
-from .schemas import FunctionalGradeRequest, HealthResponse
+from backend.core import config as core_config
+from backend.grading.router import router as grading_router
+from backend.routing.router import router as routing_router
+from backend.routing import config as routing_config
+from backend.p2p.router import router as p2p_router
 
-app = FastAPI(title="Amazon Relay — Condition Grading Agent", version="0.1.0")
+app = FastAPI(title="Amazon Relay API", version="1.0.0")
 
-# CORS wide open for local dev / demo.
+# CORS wide open for local dev / demo (the three static demo UIs call this from other ports).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -31,87 +32,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-INDEX_HTML = config.FRONTEND_DIR / "index.html"
+# Mount the three domains. Routers are thin; all logic lives in the domain packages.
+app.include_router(grading_router)
+app.include_router(routing_router)
+app.include_router(p2p_router)
+
+INDEX_HTML = core_config.FRONTEND_DIR / "index.html"
 
 
 @app.get("/")
 def index():
-    """Serve the skeletal demo UI."""
+    """Serve the grading demo UI for convenience (the other two UIs serve statically)."""
     if INDEX_HTML.exists():
         return FileResponse(INDEX_HTML)
-    return JSONResponse(
-        {"error": "frontend/index.html not found"}, status_code=404
-    )
+    return JSONResponse({"error": "frontend/index.html not found"}, status_code=404)
 
 
-@app.get("/health", response_model=HealthResponse)
+@app.get("/health")
 def health():
-    return HealthResponse(
-        status="ok",
-        model=config.GEMINI_MODEL,
-        api_key_present=config.has_api_key(),
-    )
-
-
-def _save_uploads(files: List[UploadFile], dest_dir: Path) -> list[str]:
-    """Persist uploaded files to a temp dir; return their paths."""
-    paths: list[str] = []
-    for f in files:
-        # Guard against empty file slots from the form.
-        if not f or not f.filename:
-            continue
-        out = dest_dir / Path(f.filename).name
-        with out.open("wb") as buf:
-            shutil.copyfileobj(f.file, buf)
-        paths.append(str(out))
-    return paths
-
-
-@app.post("/grade")
-async def grade(
-    category: str = Form(...),
-    reference_images: List[UploadFile] = File(default=[]),
-    inspection_images: List[UploadFile] = File(default=[]),
-):
-    """Visual / hybrid grading. Multipart: category + two image groups.
-
-    Uploads are saved to a temp dir that is cleaned up after grading.
-    """
-    path = get_path(category)
-
-    tmp = Path(tempfile.mkdtemp(prefix="relay_"))
-    try:
-        ref_dir = tmp / "reference"
-        insp_dir = tmp / "inspection"
-        ref_dir.mkdir()
-        insp_dir.mkdir()
-
-        ref_paths = _save_uploads(reference_images, ref_dir)
-        insp_paths = _save_uploads(inspection_images, insp_dir)
-
-        if not insp_paths:
-            return JSONResponse(
-                {
-                    "grade": "ERROR",
-                    "reasoning": "No inspection images uploaded.",
-                    "path": path,
-                },
-                status_code=400,
-            )
-
-        # visual + hybrid both run the visual agent in this MVP.
-        # (hybrid's answer-merge is a Phase 2 TODO; functional-only categories
-        #  should use /grade/functional.)
-        result = grade_visual(ref_paths, insp_paths, category)
-        result["path"] = path
-        return JSONResponse(result)
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
-
-
-@app.post("/grade/functional")
-async def grade_functional_endpoint(req: FunctionalGradeRequest):
-    """Functional grading from yes/no answers."""
-    result = grade_functional(req.answers, req.category)
-    result["path"] = "functional"
-    return JSONResponse(result)
+    """Aggregate health across all three domains."""
+    return {
+        "status": "ok",
+        "modules": ["grading", "routing", "p2p"],
+        "model": core_config.GEMINI_MODEL,
+        "api_key_present": core_config.has_api_key(),
+        "db_ready": core_config.DB_PATH.exists(),
+        "router_model_trained": routing_config.MODEL_PATH.exists(),
+    }

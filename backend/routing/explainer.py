@@ -2,18 +2,12 @@
 
 This NEVER affects the decision (it runs after routing is final) and NEVER throws. With no
 GEMINI_API_KEY it returns a templated string built from the routing JSON.
+
+The Gemini client + SDK come from backend.core.gemini (the single shared loader).
 """
 from __future__ import annotations
 
-# Reuse the grading service's Gemini config (model name + key loader).
-from backend import config as gemini_config
-
-try:
-    from google import genai
-    from google.genai import types
-except Exception:  # pragma: no cover
-    genai = None
-    types = None
+from backend.core import gemini as gemini_core
 
 _SYSTEM = (
     "You are an operations analyst for Amazon Relay, a reverse-logistics system. Given a routing "
@@ -58,15 +52,15 @@ def _template(routing_json: dict) -> str:
 
 def explain_decision(routing_json: dict) -> str:
     """Return a short narrative. LLM if a key is set, else a templated string. Never raises."""
-    if genai is None or not gemini_config.has_api_key():
+    if not gemini_core.sdk_available() or not gemini_core.has_api_key():
         return _template(routing_json)
 
     try:
         import json
-        client = genai.Client(api_key=gemini_config.GEMINI_API_KEY)
+        client = gemini_core.get_client()
         resp = client.models.generate_content(
-            model=gemini_config.GEMINI_MODEL,
-            config=types.GenerateContentConfig(system_instruction=_SYSTEM),
+            model=gemini_core.MODEL,
+            config=gemini_core.types.GenerateContentConfig(system_instruction=_SYSTEM),
             contents=[json.dumps(routing_json)],
         )
         text = (resp.text or "").strip()

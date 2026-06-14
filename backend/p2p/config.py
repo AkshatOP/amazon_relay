@@ -3,14 +3,17 @@
 P2P Resale Exchange — the ONLY module where age + condition depreciation lives.
 Routing treats every return as a NEW unit (full original_price, no depreciation).
 That distinction is load-bearing; do not blur it.
+
+The DATABASE path comes from backend.core.config (the ONE consolidated relay.db); P2P_DB_PATH
+is an alias kept so the existing p2p modules keep working unchanged.
 """
 from __future__ import annotations
 
-from pathlib import Path
+from backend.core.config import DB_PATH
 
 # --- Paths -------------------------------------------------------------------
-P2P_DIR = Path(__file__).resolve().parent
-P2P_DB_PATH = P2P_DIR / "db" / "relay_p2p.db"
+# The p2p tables (users, purchases, listings, p2p_demand) live in the one shared DB.
+P2P_DB_PATH = DB_PATH
 
 # --- Delivery vehicle (individual P2P pickup / drop) -------------------------
 DELIVERY_BIKE = {

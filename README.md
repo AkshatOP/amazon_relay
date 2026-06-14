@@ -1,22 +1,27 @@
-# Amazon Relay — Condition Grading Agent (MVP)
+# Amazon Relay
 
 Amazon HackOn 2026 submission. An intelligent reverse-logistics system that gives
-returned/unused products a meaningful second life. This MVP implements the first and
-most critical stage: the **Condition Grading Agent**.
+returned/unused products a meaningful second life — **grade → route → resell/refurbish/donate/
+liquidate**, plus a proactive **P2P resale exchange** for items a customer still owns.
 
-> Read [`docs/CONTEXT.md`](docs/CONTEXT.md) for the full problem statement and solution,
-> and [`docs/TODO.md`](docs/TODO.md) for the phased build tracker.
+> - Structure / file map → [`backend/README.md`](backend/README.md) (read this first)
+> - Problem statement + solution → [`docs/CONTEXT.md`](docs/CONTEXT.md)
+> - How it fits together → [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+> - Build tracker → [`docs/TODO.md`](docs/TODO.md)
 
 ## What it does
 
-Given **reference photos** of a good product and **inspection photos** of a returned
-product (captured by the delivery rider on pickup), a Google Gemini VLM grades the
-**condition delta** between them and emits strict JSON (grade A–D, score, defects,
-resale eligibility) that a downstream router can consume.
+Three domains, one FastAPI backend on a single port (`:8000`):
 
-Two grading paths, auto-selected from product category:
-- **Visual path** (hero) — for products where condition = what you can see (shoes, clothing, bags…).
-- **Functional path** (stub) — for products where a photo is useless (chargers, speakers…); graded by yes/no rules.
+1. **Grading** (Gemini VLM) — given **reference** photos (catalog, design context only) and
+   **inspection** photos (the returned item), grades real damage on the returned unit and emits
+   strict JSON (grade A–D, score, defects, resale eligibility). Visual (hero) + functional (stub)
+   paths, auto-selected by category.
+2. **Routing** (XGBoost + hard economic gates) — decides `RESELL_LOCAL / REFURBISH / DONATE /
+   LIQUIDATE` by logistics arbitrage (returns treated as NEW units at full price). Two regions:
+   Bengaluru metro and Udupi tier-3.
+3. **P2P resale exchange** — a time-triggered nudge when an owned item enters its resale window,
+   two-stage pricing, a Product Health Card, same-town buyer matching, and handoff logistics.
 
 ## Run it
 
@@ -28,43 +33,49 @@ pip install -r requirements.txt
 export GEMINI_API_KEY="your-key-here"
 #   ...or: cp .env.example .env  and fill it in
 
-# 3. Start the server (from the amazon-relay/ root)
+# 3. Seed the one consolidated database
+python -m backend.seed.seed_all
+
+# 4. Start the single backend (from the amazon-relay/ root)
 uvicorn backend.main:app --reload
 
-# 4. Open the demo
-#    http://localhost:8000
+# 5. Open the demos
+#    http://localhost:8000            → grading UI (served by the app)
+#    http://localhost:8000/docs       → Swagger for ALL endpoints
+#    python -m http.server 5500 --directory frontend_routing   → routing UI  (calls :8000)
+#    python -m http.server 5600 --directory frontend_p2p       → p2p UI      (calls :8000/p2p)
 ```
 
-## Manual test checklist
+## API (single port)
 
-1. Page loads at `http://localhost:8000`.
-2. Pick a category (e.g. **Footwear / Shoes**).
-3. Upload 1+ **reference** (good) photos and 1+ **inspection** (returned) photos.
-   Drop your own test images into `sample_images/` (see its README).
-4. Click **Grade it** → valid JSON appears below.
-5. Sanity checks:
-   - Clean item vs its reference → **Grade A/B**.
-   - Clearly worn item → **Grade C**.
-   - Broken / cracked item → **Grade D**.
-6. A malformed model response never 500s — it returns a structured `"grade": "ERROR"` object.
+| Method | Path | Body / purpose |
+|--------|------|----------------|
+| GET  | `/` | serves the grading demo UI |
+| GET  | `/health` | aggregate status across all three domains |
+| POST | `/grade` | multipart: `category`, `reference_images[]`, `inspection_images[]` |
+| POST | `/grade/functional` | JSON: `{"category": "...", "answers": [true, false, ...]}` |
+| POST | `/route` | route a graded return |
+| POST | `/grade-and-route` | route a supplied `grade_json` (in-process) |
+| GET/POST | `/p2p/*` | nudge · list · listing · demand/find · demand/generate · handoff · purchases |
 
-## API
-
-| Method | Path                | Body                                                            |
-|--------|---------------------|-----------------------------------------------------------------|
-| GET    | `/`                 | serves the demo UI                                              |
-| GET    | `/health`           | `{"status": "ok", "model": "..."}`                             |
-| POST   | `/grade`            | multipart: `category`, `reference_images[]`, `inspection_images[]` |
-| POST   | `/grade/functional` | JSON: `{"category": "...", "answers": [true, false, ...]}`     |
+`/docs` covers everything.
 
 ## Layout
 
 ```
 amazon-relay/
-├── docs/        # CONTEXT, ARCHITECTURE, TODO
-├── .agents/     # agent specs (grading, routing)
-├── skills/      # grading_skill.md — the runtime system prompt / rubric
-├── backend/     # FastAPI app + grading agents
-├── frontend/    # index.html demo
+├── backend/         # THE app
+│   ├── main.py      #   single FastAPI app (one port)
+│   ├── core/        #   shared config, db, gemini
+│   ├── grading/     #   Phase 1 — Gemini VLM grading
+│   ├── routing/     #   Phase 3/3b — geo-routing + XGBoost
+│   ├── p2p/         #   Phase 5 — resale exchange
+│   ├── data/        #   relay.db (generated, gitignored)
+│   └── seed/        #   seed_routing / seed_p2p / seed_all + README
+├── frontend/            # grading demo UI (served at /)
+├── frontend_routing/    # routing demo UI (static, :5500)
+├── frontend_p2p/        # p2p demo UI (static, :5600)
+├── skills/          # grading_skill.md — the runtime rubric
+├── docs/            # CONTEXT, ARCHITECTURE, TODO
 └── sample_images/
 ```

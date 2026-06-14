@@ -1,30 +1,27 @@
-"""Amazon Relay — Routing API (Phase 3). SEPARATE FastAPI app on PORT 8100.
+"""Routing APIRouter — thin wrappers over the routing decision logic.
 
-The grading API owns port 8000 and is untouched. Run:
-    uvicorn routing.route_api:app --reload --port 8100
+Mounted at the app root by backend/main.py. Endpoints:
+  POST /route            — route a pre-graded return
+  POST /grade-and-route  — route a supplied grade_json (in-process; no HTTP hop)
+
+The decision logic lives in router_logic.py (hard gates + XGBoost). This file only parses
+the request, calls route_return(), attaches the explainer narrative, logs, and responds.
 """
 from __future__ import annotations
 
-import sqlite3
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-import httpx
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from backend.core import db as core_db
 from . import config
 from .explainer import explain_decision
-from .router import route_return
+from .router_logic import route_return
 from .seed_locations import ACTIVE_REGION, REGIONS
 
-app = FastAPI(title="Amazon Relay — Routing API", version="0.1.0")
-app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
-)
-
-GRADING_URL = "http://localhost:8000/grade"
+router = APIRouter(tags=["routing"])
 
 
 # --- Request models ----------------------------------------------------------
@@ -36,7 +33,7 @@ class OrderMeta(BaseModel):
     category: str = "footwear"
     original_price: float = 2000
     # age_months removed — returns are treated as new units at full original_price.
-    # Age/depreciation pricing belongs in the future peer-to-peer exchange product.
+    # Age/depreciation pricing belongs in the P2P exchange product.
     customer_lat: float = 12.9166
     customer_lng: float = 77.6101
     # Optional region selector. "bengaluru" or "udupi". Defaults to ACTIVE_REGION when absent.
@@ -50,18 +47,18 @@ class RouteRequest(BaseModel):
 
 class GradeAndRouteRequest(BaseModel):
     order_meta: OrderMeta
-    # Optional pre-supplied grade, used if the grading service (:8000) is unreachable.
+    # Pre-supplied grade. Image grading goes through POST /grade (multipart) in the same app.
     grade_json: Optional[dict[str, Any]] = Field(default=None)
 
 
 # --- Decision logging --------------------------------------------------------
 
 def _log_decision(order_meta: dict, grade_json: dict, routing: dict) -> None:
-    if not config.DB_PATH.exists():
+    if not core_db.db_exists():
         return
     try:
         econ = routing.get("economics", {})
-        conn = sqlite3.connect(config.DB_PATH)
+        conn = core_db.get_connection(row_factory=False)
         conn.execute(
             "INSERT INTO returns_log (ts, order_id, asin, category, grade, decision, decided_by, "
             "resale_price, savings_local, co2_saved_kg, buyer_found) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
@@ -81,18 +78,7 @@ def _log_decision(order_meta: dict, grade_json: dict, routing: dict) -> None:
 
 # --- Endpoints ---------------------------------------------------------------
 
-@app.get("/health")
-def health():
-    return {
-        "status": "ok",
-        "service": "routing",
-        "port": 8100,
-        "model_trained": config.MODEL_PATH.exists(),
-        "db_ready": config.DB_PATH.exists(),
-    }
-
-
-@app.post("/route")
+@router.post("/route")
 def route(req: RouteRequest):
     meta = req.order_meta.model_dump()
     region_note = None
@@ -108,34 +94,27 @@ def route(req: RouteRequest):
     return routing
 
 
-@app.post("/grade-and-route")
-async def grade_and_route(req: GradeAndRouteRequest):
-    """Proxy to the grading service (:8000), then route. Falls back to a supplied grade_json."""
+@router.post("/grade-and-route")
+def grade_and_route(req: GradeAndRouteRequest):
+    """Route a supplied grade_json. Grading + routing are now ONE process — to grade images,
+    POST them to /grade (multipart) and pass the returned grade_json here (or wire the two
+    calls client-side). No cross-service HTTP hop remains.
+    """
     meta = req.order_meta.model_dump()
     grade_json = req.grade_json
-    grade_source = "supplied"
     region_raw = (meta.get("region") or "").strip().lower()
     if region_raw and region_raw not in REGIONS:
         meta["region"] = None
 
-    # We can only call the grading service if we actually have images; this JSON endpoint does
-    # not carry image bytes, so it expects a pre-supplied grade_json. We still ping :8000/health
-    # so the demo can show whether the grader is alive.
     if grade_json is None:
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                r = await client.get("http://localhost:8000/health")
-                alive = r.status_code == 200
-        except Exception:
-            alive = False
         return {
-            "error": "no grade_json supplied and image grading must go through :8000/grade (multipart).",
-            "grading_service_alive": alive,
-            "hint": "POST multipart images to http://localhost:8000/grade, then send the result here as grade_json.",
+            "error": "no grade_json supplied.",
+            "hint": "POST multipart images to /grade, then send the result here as grade_json "
+                    "(grading and routing are the same service now).",
         }
 
     routing = route_return(grade_json, meta)
     routing["explanation"] = explain_decision(routing)
-    routing["grade_source"] = grade_source
+    routing["grade_source"] = "supplied"
     _log_decision(meta, grade_json, routing)
     return routing

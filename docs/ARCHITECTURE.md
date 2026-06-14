@@ -1,5 +1,12 @@
 # Amazon Relay — Architecture
 
+> **Packaging (Phase 6):** all three domains run inside ONE FastAPI app on a single port
+> (`:8000`), backed by ONE SQLite database (`backend/data/relay.db`), with shared infra in
+> `backend/core/` (config, db, gemini). Each domain is a self-contained sub-package
+> (`backend/grading`, `backend/routing`, `backend/p2p`) with a thin APIRouter
+> (`<domain>/router.py`) in front of unchanged business logic. See
+> [`backend/README.md`](../backend/README.md) for the file map and module-boundary rules.
+
 ## End-to-end pipeline (vision)
 
 ```
@@ -34,7 +41,7 @@ Return initiated                          Item still owned (not returned)
 
 ## Components
 
-### Path selection — `backend/category_map.py`
+### Path selection — `backend/grading/category_map.py`
 A `GRADING_PATH` dict maps 20 product categories → `"visual" | "functional" | "hybrid"`.
 `get_path(category)` defaults unknown categories to `"visual"`. In production the category
 is derived from the order-history SKU; in the demo it comes from a dropdown.
@@ -43,8 +50,9 @@ Categories: shoes/footwear/clothing/phone_case/bag/watch/baby_gear/toy/book (vis
 charger/power_bank/speaker/cable/mouse/keyboard (functional);
 laptop/headphones/camera/appliance (hybrid).
 
-### Condition Grading Agent (visual) — `backend/grading_agent.py`
-The hero. `grade_visual(reference_image_paths, inspection_image_paths, category)`:
+### Condition Grading Agent (visual) — `backend/grading/grading_agent.py`
+The hero. `grade_visual(reference_image_paths, inspection_image_paths, category)`
+(builds its Gemini call via the shared `backend/core/gemini.py` client):
 1. Loads `skills/grading_skill.md` as the Gemini **system instruction**.
 2. Reads image bytes; builds a multimodal request with **clearly labelled groups** — a text
    part marking the reference set as **"catalog, context only"**, then the reference image
@@ -68,25 +76,28 @@ first (a broken zipper blocks resale even on a cosmetically clean item), then su
 stains / discolouration / uneven fading — judging fading by comparing one area of the returned
 item to another, not to the catalog colour.
 
-### Functional Grader (stub) — `backend/functional_grader.py`
+### Functional Grader (stub) — `backend/grading/functional_grader.py`
 `grade_functional(answers: list[bool])` applies simple rules (all yes → B/7; majority yes →
 C/4; mostly no → D/2) and emits the **same** JSON schema.
 
-### Schema — `backend/schemas.py`
+### Schema — `backend/grading/schemas.py`
 Pydantic models enforce `grade ∈ {A,B,C,D}`, the score band matching the grade,
 `confidence ∈ [0,1]`, and the rubric-derived booleans. The uniform `GradeResult` is what
 every path returns and what downstream consumes.
 
-### API — `backend/main.py`
-- `GET /` serves `frontend/index.html`.
+### App + routers — `backend/main.py` + `<domain>/router.py`
+`backend/main.py` is the single FastAPI app: CORS, `GET /`, aggregate `GET /health`, and
+`include_router()` for the three thin domain routers. Grading's router
+(`backend/grading/router.py`) exposes:
 - `POST /grade` — multipart (`category`, `reference_images[]`, `inspection_images[]`); saves
   uploads to a temp dir, looks up the path, calls `grade_visual` for visual/hybrid.
 - `POST /grade/functional` — JSON yes/no answers → `grade_functional`.
-- `GET /health`; CORS enabled for local dev.
 
-### Config — `backend/config.py`
-Centralizes the Gemini model name (`GEMINI_MODEL`, default `gemini-2.5-flash`) and loads
-`GEMINI_API_KEY` from the environment / `.env`. Swap the model in one place.
+### Shared config — `backend/core/config.py` (+ scoped `<domain>/config.py`)
+`core/config.py` loads ONE root `.env` and centralizes the Gemini model name (`GEMINI_MODEL`,
+default `gemini-2.5-flash`), `GEMINI_API_KEY`, and `DB_PATH` (`backend/data/relay.db`). Each
+domain keeps its own scoped `config.py` for domain-specific constants and pulls the shared
+bits from core. The single Gemini client lives in `backend/core/gemini.py`.
 
 ## Why a uniform output schema
 
@@ -94,10 +105,12 @@ The two paths produce condition grades in completely different ways (a VLM vs a 
 but they emit identical JSON. This decouples grading from routing: the Phase 3 XGBoost router
 consumes `score` + `defects` length + `grade` without knowing or caring how they were derived.
 
-## Routing Agent (Phase 3) — `routing/`
+## Routing Agent (Phase 3) — `backend/routing/`
 
-A **separate, independently-importable package** on **port 8100**. Consumes the grading JSON
-and decides: `RESELL_LOCAL | REFURBISH | DONATE | LIQUIDATE`.
+A self-contained, independently-importable sub-package mounted at the app root
+(`POST /route`, `POST /grade-and-route`). Consumes the grading JSON and decides:
+`RESELL_LOCAL | REFURBISH | DONATE | LIQUIDATE`. Decision logic is `router_logic.py`; the
+thin APIRouter is `router.py`.
 
 ### Core framing: logistics arbitrage, not resale pricing
 
@@ -107,10 +120,10 @@ full original price**. There is no age depreciation in routing. The decision is 
 > **"Is intercepting this return locally cheaper/greener than hauling it to the FC AND
 > shipping a fresh unit FROM the FC back to the same nearby buyer?"**
 
-Age/depreciation pricing is reserved for a separate future peer-to-peer exchange product
-(`routing/pricing.py` is stubbed with that note). It does NOT belong here.
+Age/depreciation pricing belongs to the P2P exchange product
+(`backend/routing/pricing.py` is stubbed with that note). It does NOT belong here.
 
-### Decision pipeline (`routing/router.py`)
+### Decision pipeline (`backend/routing/router_logic.py`)
 
 ```
 grade_json + order_meta (no age_months)
@@ -119,7 +132,7 @@ grade_json + order_meta (no age_months)
   1. item_value = original_price  (unit is new — no pricing step, no depreciation)
         │
         ▼
-  2. Geography (routing/geo.py)
+  2. Geography (backend/routing/geo.py)
      nearest_rcc ← haversine over 8 Bengaluru RCCs × 1.4 road-circuity factor
      nearest_fc  ← 4 FCs mapped from the chosen RCC
         │
@@ -128,7 +141,7 @@ grade_json + order_meta (no age_months)
      buyer_found, buyer_distance_km, buyer_pincode
         │
         ▼
-  4. Dual-path economics (routing/economics.py) — PER ITEM, amortized
+  4. Dual-path economics (backend/routing/economics.py) — PER ITEM, amortized
      full_path  = leg1 (customer→RCC)              [mini-truck, 18 items/trip]
                 + leg2 (RCC→FC)                    [container truck, 250 items/trip]
                 + reship (FC→nearby buyer)          [container if >50 km, mini-truck if local]
@@ -153,8 +166,8 @@ grade_json + order_meta (no age_months)
      → fallback: decided_by="rule_fallback" if .pkl absent
         │
         ▼
-  7. Explainer (routing/explainer.py) — ONE Gemini call, never affects the decision
-     2–3 sentence ops/buyer-facing narrative. Templated fallback if no API key.
+  7. Explainer (backend/routing/explainer.py) — ONE Gemini call via core/gemini, never
+     affects the decision. 2–3 sentence ops/buyer-facing narrative. Templated fallback if no key.
 ```
 
 ### Geography model — multi-region
@@ -175,10 +188,10 @@ Customer → Local Delivery Station (acts as mini-RCC + holding)
                └── (no buyer)  → 400 km Ghats haul → BLR FC → reship fresh unit
 ```
 
-Switch region by setting `ACTIVE_REGION` in `routing/seed_locations.py` or by passing
+Switch region by setting `ACTIVE_REGION` in `backend/routing/seed_locations.py` or by passing
 `"region": "udupi"` / `"region": "bengaluru"` in the `/route` request body.
-The tier-3 projection (612 km synthetic) is suppressed for Udupi — the real 400 km IS
-the tier-3 story. See `routing/db/README_udupi_demo.md` for exact demo inputs.
+The tier-3 projection (612 km synthetic) is suppressed for Udupi — the real 448 km IS
+the tier-3 story. See `backend/seed/README_udupi_demo.md` for exact demo inputs.
 
 ### Economics honesty
 
@@ -199,20 +212,28 @@ Full original price is used (unit is new). A cheap heavy book (poor scrap recove
 costly haul, decent donation ESG credit) donates; a light watch may liquidate. The boundary
 emerges from category economics — no hardcoded price thresholds.
 
-### Ports
+### Single-port route map (Phase 6)
 
-| Port | Service |
-|------|---------|
-| 8000 | Grading API (`backend/main.py`) — **never touched by routing or p2p** |
-| 8100 | Routing API (`routing/route_api.py`) |
-| 8200 | P2P Resale Exchange API (`p2p/p2p_api.py`) |
-| 5500 | Routing demo UI (`frontend_routing/index.html`) |
-| 5600 | P2P demo UI (`frontend_p2p/index.html`) |
+All endpoints are served by one app (`uvicorn backend.main:app`) on **:8000**:
 
-## P2P Resale Exchange (Phase 5) — `p2p/`
+| Method | Path | Domain |
+|--------|------|--------|
+| GET  | `/health` | app (aggregates all three) |
+| GET  | `/` | serves the grading demo UI |
+| POST | `/grade`, `/grade/functional` | grading |
+| POST | `/route` | routing |
+| POST | `/grade-and-route` | routing — **in-process** grade→route (no HTTP hop) |
+| GET  | `/p2p/purchases`, `/p2p/nudge/{id}`, `/p2p/listing/{id}` | p2p |
+| POST | `/p2p/list`, `/p2p/demand/find`, `/p2p/demand/generate`, `/p2p/handoff` | p2p |
+
+Previously these ran as three apps on :8000/:8100/:8200 and `/grade-and-route` proxied to the
+grading service over HTTP. That HTTP hop is gone — everything is one process now. The three
+demo UIs stay separate static pages (served on :5500/:5600 and at `/`); they all call :8000.
+
+## P2P Resale Exchange (Phase 5) — `backend/p2p/`
 
 **Decoupled from routing.** Routing and P2P never import each other. Physical constants
-(diesel rate, CO₂ factor, vehicle specs) are copied into `p2p/config.py`.
+(vehicle specs, warranty rate) live in `backend/p2p/config.py`; the DB path comes from core.
 
 ### The one rule: age + condition depreciation lives ONLY here
 
@@ -256,7 +277,7 @@ Step 2: Seller lists item (after grading) → Stage-2 price revealed + Health Ca
 Step 3: find_nearby_demand() — same-town buyers within P2P_DEMAND_RADIUS_KM (12 km)
       │
       ▼
-Step 4: compute_handoff() — seller→station→buyer, CO₂ vs buying new, green credits
+Step 4: compute_handoff() — seller→station→buyer logistics, platform fee, seller payout
 ```
 
 ### Financials
@@ -266,7 +287,7 @@ For the demo scenario: asking ₹4,260 → fee ₹213 → payout ₹4,047.
 
 ---
 
-## P2P Lifespan table — `p2p/lifespan_table.py`
+## P2P Lifespan table — `backend/p2p/lifespan_table.py`
 
 22 categories with tuned `(min_years, max_years, avg_years)` resale windows, aligned to the
 grading API's 20 categories plus baby_monitor, smartphone, backpack. Examples:
@@ -282,7 +303,7 @@ grading API's 20 categories plus baby_monitor, smartphone, backpack. Examples:
 | book | 5.0 | 20.0 | 10.0 | edition matters more than age |
 
 `age_factor = 1.0` for any item at or before `avg_years`. Decays linearly to `AGE_VALUE_FLOOR`
-(per-category, in `p2p/pricing.py`) at `max_years`.
+(per-category, in `backend/p2p/pricing.py`) at `max_years`.
 
 ---
 

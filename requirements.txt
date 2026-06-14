@@ -5,9 +5,9 @@ python-multipart>=0.0.9
 python-dotenv>=1.0.0
 pydantic>=2.6.0
 
-# --- Phase 3: routing module ---
-httpx>=0.27.0          # routing -> grading service proxy
-xgboost>=2.0.0         # routing decision model (run routing/model/train_router.py)
+# --- Routing module ---
+httpx>=0.27.0          # OSRM road-distance lookups (backend/routing/geo.py)
+xgboost>=2.0.0         # routing decision model (run: python -m backend.routing.model.train_router)
 scikit-learn>=1.4.0    # train/test split + metrics
 pandas>=2.2.0          # training CSV loading
 numpy>=1.26.0          # feature vectors

@@ -158,7 +158,7 @@
 </div><!-- /container -->
 
 <script>
-const API = "http://localhost:8200";
+const API = "http://localhost:8000/p2p";   // unified backend, /p2p-prefixed routes
 let currentPurchaseId = 1;
 let currentListingId = null;
 let currentDemandId = null;
@@ -416,7 +416,7 @@ async function showLoading(id, fn) {
   document.getElementById(id).innerHTML = '<div class="result" style="color:#888">Loading…</div>';
   try { return await fn(); }
   catch(e) {
-    document.getElementById(id).innerHTML = `<div class="result err">Error: ${e.message}. Is the P2P API running on port 8200?</div>`;
+    document.getElementById(id).innerHTML = `<div class="result err">Error: ${e.message}. Is the backend running on :8000? — uvicorn backend.main:app</div>`;
     throw e;
   }
 }

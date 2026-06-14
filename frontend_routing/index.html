@@ -32,7 +32,7 @@
   <p class="sub">Phase 3. Takes a graded return and decides:
     <b>RESELL_LOCAL / REFURBISH / DONATE / LIQUIDATE</b> using geography + economics + XGBoost.
     Returns are treated as <b>new units at full price</b> — routing is logistics arbitrage.
-    Calls the routing API on <code>:8100</code>.</p>
+    Calls the unified backend on <code>:8000</code>.</p>
 
   <fieldset>
     <legend>Region</legend>
@@ -122,7 +122,7 @@
   </div>
 
   <script>
-    const API = "http://localhost:8100";
+    const API = "http://localhost:8000";   // unified backend (single port)
 
     const PRESETS = {
       udupi: [
@@ -229,7 +229,7 @@
         render(data);
         status.textContent = "";
       } catch (e) {
-        status.textContent = " ERROR: " + e + " (is the routing API running on :8100?)";
+        status.textContent = " ERROR: " + e + " (is the backend running on :8000? — uvicorn backend.main:app)";
       }
     }
 

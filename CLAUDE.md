@@ -6,150 +6,106 @@ Project guidance for Claude Code working in this repo.
 Amazon Relay — Amazon HackOn 2026 submission. An intelligent reverse-logistics system that
 gives returned products a second life (resell / refurbish / donate / liquidate / P2P resale).
 **Phases 1 (grading), 3 (geo-routing), and 5 (P2P exchange) are complete and live-tested.**
+As of Phase 6, all three run inside **ONE FastAPI backend on a single port (:8000)**.
 
-- Full problem statement + solution framing → [`docs/CONTEXT.md`](docs/CONTEXT.md)
+- First file to read for structure → [`backend/README.md`](backend/README.md)
+- Problem statement + solution framing → [`docs/CONTEXT.md`](docs/CONTEXT.md)
 - Phased build tracker / current status → [`docs/TODO.md`](docs/TODO.md)
 - How pieces fit together → [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-- Agent specs → [`.agents/`](.agents/)
+- Seeding the one DB → [`backend/seed/README.md`](backend/seed/README.md)
 
-## Core idea
-A Google Gemini VLM inspects **inspection** photos (the returned product, captured by the
-delivery rider) for real damage, using **reference** photos (catalog image) only as design
-context — NOT as a similarity/pixel-delta target. Output is strict JSON (grade A–D, score,
-defects, resale eligibility) — the same schema regardless of grading path, so the downstream
-router is path-agnostic.
+## Unified backend (Phase 6)
 
-Two paths, auto-selected by category (`backend/category_map.py`):
-- **visual** (hero) → `backend/grading_agent.py` (Gemini)
-- **functional** (stub) → `backend/functional_grader.py` (yes/no rules)
-- **hybrid** → visual now; answer-merge is a Phase 2 TODO
+ONE app, ONE port, ONE database, three self-contained domains under `backend/`:
 
-## Key files — Grading (Phase 1)
-| File | Role |
-|------|------|
-| `skills/grading_skill.md` | The runtime system prompt / rubric the VLM loads. Edit grading behavior here. |
-| `backend/grading_agent.py` | Visual path: labelled image groups → Gemini → defensive JSON parse + retry. |
-| `backend/schemas.py` | `GradeResult` strict schema (grade/score-band/boolean consistency). |
-| `backend/config.py` | Model name (`GEMINI_MODEL`, default `gemini-2.5-flash`) + key loading. Swap model here. |
-| `backend/main.py` | FastAPI: `GET /`, `GET /health`, `POST /grade`, `POST /grade/functional`. |
-| `backend/category_map.py` | 20 categories → grading path. Visual/functional/hybrid. |
-| `frontend/index.html` | Skeletal vanilla-JS demo UI. |
-
-## Run / test — Grading
-```bash
-pip install -r requirements.txt   # or use the existing .venv/
-export GEMINI_API_KEY="..."
-uvicorn backend.main:app --reload  # from repo root → http://localhost:8000
 ```
-A `.venv/` with deps already installed exists from the initial build.
+backend/
+├── main.py            # the single FastAPI app: CORS + includes 3 routers + GET / + GET /health
+├── core/              # shared infra (the ONLY common import for all domains)
+│   ├── config.py      #   GEMINI_API_KEY/MODEL, DB_PATH, project paths, one .env loader
+│   ├── gemini.py      #   the one Gemini client/key loader
+│   └── db.py          #   the one get_connection() → backend/data/relay.db
+├── grading/  (Phase 1)   config.py · grading_agent.py · functional_grader.py · category_map.py · schemas.py · router.py
+├── routing/  (Phase 3/3b) config.py · seed_locations.py · geo.py · economics.py · pricing.py(stub) · router_logic.py · explainer.py · model/ · router.py
+├── p2p/      (Phase 5)   config.py · lifespan_table.py · pricing.py · notifier.py · listing.py · demand.py · handoff.py · router.py
+├── data/relay.db      # the ONE consolidated db (generated, gitignored)
+└── seed/              # seed_routing.py · seed_p2p.py · seed_all.py · README.md
+```
+
+### Run / seed
+```bash
+pip install -r requirements.txt    # or use the existing .venv/
+export GEMINI_API_KEY="..."        # or a root .env
+python -m backend.seed.seed_all    # build backend/data/relay.db
+uvicorn backend.main:app --reload  # → http://localhost:8000  (/docs covers everything)
+```
+Demo UIs (static, each on its own port, all call :8000):
+- grading UI served by the app at `/`
+- `python -m http.server 5500 --directory frontend_routing`  (calls `:8000`)
+- `python -m http.server 5600 --directory frontend_p2p`      (calls `:8000/p2p`)
+
+### Route map (single port)
+`GET /health` · `GET /` · `POST /grade` · `POST /grade/functional` · `POST /route` ·
+`POST /grade-and-route` · `GET /p2p/purchases` · `GET /p2p/nudge/{id}` · `POST /p2p/list` ·
+`GET /p2p/listing/{id}` · `POST /p2p/demand/find` · `POST /p2p/demand/generate` · `POST /p2p/handoff`
+
+## MODULE BOUNDARIES (load-bearing — keep true)
+1. **Domains never import each other's logic.** `grading ⊥ routing ⊥ p2p`. The only common
+   import is `backend/core/`. Need a helper from another domain? Copy the small function.
+2. **Routers are thin.** Parse → call domain function → shape response. No logic in routers.
+   Upgrade a tool by editing its domain package; routers/core stay untouched.
+3. **Pricing separation is sacred.** Routing = NEW unit, full `original_price`, no depreciation
+   (logistics arbitrage). P2P = USED unit; `backend/p2p/pricing.py` is the ONLY depreciation
+   home. `backend/routing/pricing.py` stays a stub. They never share a pricing path.
+4. **Each domain is independently importable** for tests.
+5. **Never throw across the API boundary.** grading → `grade:"ERROR"`; routing never 500s
+   (rule-fallback if `.pkl` absent); p2p → `{"error": ...}`.
+
+## Core idea (grading)
+A Gemini VLM inspects **inspection** photos (the returned product) for real damage, using
+**reference** photos (catalog image) only as design context — NOT a similarity/pixel-delta
+target. Output is strict JSON (grade A–D, score, defects, resale eligibility) — the same schema
+for every grading path, so the router is path-agnostic. Paths auto-selected by category
+(`backend/grading/category_map.py`): visual (hero) / functional (stub) / hybrid (visual now).
 
 ## Conventions / guardrails
 - **The grading agent must never throw.** Model/parse/API failures return a structured
-  `{"grade": "ERROR", ...}` dict — the endpoints must never 500 on a formatting hiccup.
-  Transient API errors (503/429/timeout) are retried with backoff before giving up.
+  `{"grade": "ERROR", ...}` dict. Transient API errors (503/429/timeout) retry with backoff.
 - Gemini wraps JSON in ```json fences often → the parser strips fences defensively. Keep that.
 - **Reference = design context only, never a similarity target.** Catalog-vs-phone differences
-  (colour/angle/lighting/background/colourway) are NOT defects. Grade damage on the returned
-  unit itself. Functional/closure defects (broken zipper etc.) block resale even if clean.
-- Uniform output schema across all paths is load-bearing for downstream routing — don't diverge.
-- Verify the `google-genai` SDK call shape against current docs before changing Gemini calls;
-  don't rely on memory.
-- This is a hackathon MVP: prefer a working vertical slice over polish. Don't over-engineer.
+  (colour/angle/lighting/background) are NOT defects. Grade damage on the returned unit itself.
+  A broken functional part (zipper etc.) blocks resale even if cosmetically clean.
+- Uniform grade schema across all paths is load-bearing for routing — don't diverge.
+- The ONE Gemini client lives in `backend/core/gemini.py`. Grading agent + routing explainer
+  both use it — don't reintroduce per-module key loaders.
+- Verify the `google-genai` SDK call shape against current docs before changing Gemini calls.
+- Hackathon MVP: prefer a working vertical slice over polish. Don't over-engineer.
 
-## Routing (Phase 3)
+## Routing notes
+- **Framing**: returns are NEW units (full `original_price`). Decision = local intercept cost
+  vs FC haul + fresh-unit reship. Hard economic gates fire before XGBoost; rule-fallback if the
+  `.pkl` is absent. Decision logic is `backend/routing/router_logic.py`.
+- **Multi-region**: `ACTIVE_REGION = "udupi"` in `backend/routing/seed_locations.py`. Pass
+  `"region": "bengaluru"|"udupi"` in the `/route` body. Udupi has no in-region FC — nearest is
+  the BLR cluster ~448 km over the Ghats (OSRM-verified). Real Udupi numbers: ₹59.82/item,
+  1.58 kg CO₂ on a ₹400 shoe.
+- **Retrain** (only if you change features): old `.pkl` is for the current 13-feature framing.
+  `python -m backend.routing.model.generate_training_data && python -m backend.routing.model.train_router`
 
-**Package:** `routing/`  **API port:** 8100  **Demo UI port:** 5500
-
-The routing module is a **self-contained package** — do NOT add routes to `backend/main.py`
-or scatter files into `backend/`. Port 8000 is reserved for grading and is never touched here.
-
-Key files:
-| File | Role |
-|------|------|
-| `routing/config.py` | All tunable constants — fuel price, vehicle mileage, demand radius, etc. |
-| `routing/seed_locations.py` | Multi-region node/FC data. `ACTIVE_REGION` switches the demo region. |
-| `routing/router.py` | Hard economic gates + XGBoost (or rule_fallback if .pkl absent). |
-| `routing/route_api.py` | FastAPI on :8100. `POST /route`, `POST /grade-and-route`, `GET /health`. |
-| `routing/economics.py` | Amortized per-item fuel + CO2; computed donate/liquidate break-even. |
-| `routing/geo.py` | OSRM road distances; nearest-node/FC; multi-region external-FC handling. |
-| `routing/model/train_router.py` | XGBoost trainer CLI — **user runs this**, not Claude. |
-| `routing/db/seed_db.py` | Seeds both Bengaluru (23 rows) + Udupi (15 rows) into SQLite. |
-| `routing/db/README_udupi_demo.md` | Exact UI inputs + expected outputs for both Udupi demo scenarios. |
-| `frontend_routing/index.html` | Demo UI. Region dropdown (Udupi/Bengaluru). Calls :8100. |
-
-**Key framing**: returns are NEW units (full original_price). Routing = logistics arbitrage:
-local intercept cost vs FC haul + fresh-unit reship. `pricing.py` is stubbed — reserved for
-the P2P exchange. Never import it in routing.
-
-**Multi-region**: `ACTIVE_REGION = "udupi"` in `seed_locations.py` (default). Pass
-`"region": "bengaluru"` or `"region": "udupi"` in the `/route` request body to override.
-Udupi has no in-region FC — nearest is BLR cluster ~448 km over Ghats (OSRM-verified).
-
-Run the routing API: `uvicorn routing.route_api:app --reload --port 8100` (from repo root, venv active).
-Seed the DB first: `python -m routing.db.seed_db`
-
-**Economic framing changed** — old `.pkl` is stale. Retrain before demoing XGBoost path:
-```bash
-python -m routing.model.generate_training_data   # already done
-python -m routing.model.train_router             # retrain with new features
-```
-Until retrained, `decided_by` will be `"rule_fallback"` — API still works fully.
-Hard gates (decided_by=`"hard_gate"`) fire before XGBoost for clear-cut cases.
-
-## P2P Resale Exchange (Phase 5)
-
-**Package:** `p2p/`  **API port:** 8200  **Demo UI port:** 5600
-
-Self-contained — **never imports from `routing/`** (and vice versa).
-
-Key files:
-| File | Role |
-|------|------|
-| `p2p/config.py` | All P2P constants — delivery vehicle, warranty bonus rate. |
-| `p2p/lifespan_table.py` | 22 categories with `(min, max, avg)` resale window years. Covers all 20 grading-API categories + baby_monitor, smartphone, backpack. |
-| `p2p/pricing.py` | **THE** age + condition depreciation module. CONDITION_MULTIPLIER A/B/C/D. Two-stage pricing. AGE_VALUE_FLOOR per category. |
-| `p2p/notifier.py` | build_resale_nudge() — Stage-1 estimate + simulate_years demo time-travel. |
-| `p2p/listing.py` | create_listing() — Stage-2 price + Health Card. Writes to listings table. |
-| `p2p/demand.py` | find_nearby_demand() + generate_demand() (demo seed button). |
-| `p2p/handoff.py` | A→station→B logistics + platform fee + seller payout. |
-| `p2p/db/seed_p2p.py` | Seed relay_p2p.db. Run: `python -m p2p.db.seed_p2p` |
-| `p2p/p2p_api.py` | FastAPI on :8200. 7 endpoints: /nudge, /list, /listing, /demand/find, /demand/generate, /handoff, /purchases |
-| `frontend_p2p/index.html` | 4-step demo UI on :5600. |
-| `p2p/README_p2p_demo.md` | Click-path + exact expected numbers. |
-
-Run P2P stack:
-```bash
-python -m p2p.db.seed_p2p
-uvicorn p2p.p2p_api:app --reload --port 8200
-python -m http.server 5600 --directory frontend_p2p
-```
-
-**Pricing separation is load-bearing:**
-- Routing = item is NEW, `original_price`, no depreciation. Logistics arbitrage only.
-- P2P = item is USED. `original_price × age_factor × CONDITION_MULTIPLIER[grade]`. This is the ONLY place age/depreciation lives.
-
-## Port map
-| Port | Service |
-|------|---------|
-| 8000 | Grading API (`backend/main.py`) |
-| 8100 | Routing API (`routing/route_api.py`) |
-| 8200 | P2P Exchange API (`p2p/p2p_api.py`) |
-| 5500 | Routing demo UI (`frontend_routing/index.html`) |
-| 5600 | P2P demo UI (`frontend_p2p/index.html`) |
+## P2P notes
+- **Two-stage pricing**: Stage-1 (pre-grade) assumes Grade C (0.40); Stage-2 uses the real
+  grade. A/B (0.85/0.65) > C → price STRUCTURALLY rises after grading (mechanical guarantee).
+- **Lifespan table** (`backend/p2p/lifespan_table.py`): 22 categories (all 20 grading-API
+  categories + baby_monitor, smartphone, backpack), each `(min, max, avg)` resale-window years.
+- **Time trigger**: `notifier.build_resale_nudge()` fires when age ∈ resale window;
+  `simulate_years` enables demo time-travel without touching the DB.
+- **Same-town handoff**: demand matched within 12 km of the seller's station; platform fee 5%.
 
 ## Status
-Phase 1 (visual agent) is **complete and live-tested** against real photos: a backpack with a
-separated zipper grades C (not resale-eligible, refurbish recommended) while a clean unit grades
-A, and catalog-vs-phone differences are correctly ignored. Skill also covers stains/fading.
-
-Phase 3 (geo-routing) is **complete and API-tested**: :8100 routes returns to RESELL_LOCAL /
-REFURBISH / DONATE / LIQUIDATE using hard economic gates + rule engine. XGBoost activates
-after one `train_router.py` run. Demo UI on :5500 shows decision badge, scores, geography, and
-money-shot savings. **Two regions live**: Bengaluru (FC ~22 km, modest savings) and Udupi
-(FC ~448 km over Ghats, ₹59.82/item saved, 1.58 kg CO₂ avoided on a ₹400 shoe).
-
-Phase 5 (P2P exchange) is **complete and API-tested**: :8200 handles the full 4-step flow —
-time-triggered nudge → graded listing with Health Card → nearby buyer match → handoff logistics.
-lifespan_table covers all 22 categories. Seed DB has 2 demo purchases (Udupi).
+Phase 1 (visual agent) — complete, live-tested against real photos. Phase 3/3b (geo-routing) —
+complete, API-tested; two regions (Bengaluru metro, Udupi tier-3). Phase 5 (P2P) — complete,
+API-tested; full 4-step flow. **Phase 6 (consolidation) — complete**: one app on :8000, one
+`relay.db`, one Gemini loader, thin routers, `grade-and-route` now in-process (no HTTP hop).
+All endpoints verified on the unified app with identical numbers to the pre-merge services.
 
 Next: Phase 2 hybrid answer-merge. See `docs/TODO.md`.

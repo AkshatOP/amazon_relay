@@ -38,8 +38,12 @@ hundreds of km to a warehouse and being liquidated at a loss, Relay:
 | Phase 4 | Product Health Card (standalone) | ⚪ not built as separate module |
 | Phase 5 | P2P Resale Exchange | ✅ complete, API live |
 
-Health Card is built inside Phase 5 — `p2p/listing.py::build_health_card()` assembles it
-at listing creation time, which is the natural moment when all data is available.
+Health Card is built inside Phase 5 — `backend/p2p/listing.py::build_health_card()` assembles
+it at listing creation time, which is the natural moment when all data is available.
+
+> **Phase 6 (packaging):** grading, routing, and P2P now run inside ONE FastAPI backend on a
+> single port (`:8000`) backed by one SQLite database (`backend/data/relay.db`). The three
+> domains stay self-contained sub-packages under `backend/`; see `backend/README.md`.
 
 ---
 
@@ -156,7 +160,7 @@ original bill trust anchor, age, and price breakdown into a buyer-facing card.
 ### Pricing separation (load-bearing constraint)
 - **Routing** = item is NEW, `original_price`, zero depreciation. Logistics arbitrage only.
 - **P2P** = item is USED. `original_price × age_factor × CONDITION_MULTIPLIER[grade]`.
-  P2P (`p2p/pricing.py`) is the **only** place age + condition depreciation lives.
+  P2P (`backend/p2p/pricing.py`) is the **only** place age + condition depreciation lives.
   Routing and P2P never import each other.
 
 ---
@@ -164,5 +168,5 @@ original bill trust anchor, age, and price breakdown into a buyer-facing card.
 ## Output contract (uniform across all grading paths)
 
 Regardless of visual / functional / hybrid, the grade is emitted as the **same strict JSON**
-(see `skills/grading_skill.md` and `backend/schemas.py`) so the downstream router never has
-to care which path was used.
+(see `skills/grading_skill.md` and `backend/grading/schemas.py`) so the downstream router
+never has to care which path was used.

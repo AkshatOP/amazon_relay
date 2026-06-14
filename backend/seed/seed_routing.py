@@ -1,4 +1,4 @@
-"""Build routing/db/relay_routing.db — the demo's local-demand pool, NGOs, and decision log.
+"""Seed the routing tables (pending_orders, ngos, returns_log) into the consolidated relay.db.
 
 Deterministic (fixed RNG seed) so the demo is reproducible.
 
@@ -7,12 +7,11 @@ Regions:
   udupi     — buyers scattered around 576xxx pincodes + TWO precise demo scenarios:
 
     Scenario A (HERO): niche shoe, grade A, Udupi City pickup, Manipal buyer ~6 km away.
-                       Expected: RESELL_LOCAL (hard gate fires). Saves ~50 Rs + 1.4 kg CO2 on
-                       a Rs 400 item — FC is 400 km over the Ghats.
+                       Expected: RESELL_LOCAL (hard gate fires).
     Scenario B (CONTRAST): same shoe, grade D, Kundapura pickup, NO local buyer seeded.
                             Expected: DONATE or LIQUIDATE (hard gate 1: grade D).
 
-Run: python -m routing.db.seed_db
+Run: python -m backend.seed.seed_routing
 """
 from __future__ import annotations
 
@@ -20,8 +19,9 @@ import random
 import sqlite3
 from datetime import date, timedelta
 
-from ..config import DB_PATH
-from ..seed_locations import REGIONS
+from backend.core import db as core_db
+from backend.core.config import DB_PATH
+from backend.routing.seed_locations import REGIONS
 
 # ── ASIN pools ───────────────────────────────────────────────────────────────
 
@@ -166,8 +166,6 @@ def _seed_udupi(rng: random.Random, today: date) -> list[tuple]:
     rows: list[tuple] = []
 
     # ── Scenario A buyer (PRECISE — do not jitter) ────────────────────────────
-    # Buyer in Manipal who ordered the niche shoe that the Udupi City return will match.
-    # Udupi City station: (13.3409, 74.7421). Manipal: (13.3490, 74.7869) → ~5-6 km road.
     rows.append((
         "UORD_DEMO_A", UDUPI_NICHE_SHOE_ASIN, "Niche Artisan Shoes", "shoes",
         13.3502, 74.7876, "576104",
@@ -177,46 +175,32 @@ def _seed_udupi(rng: random.Random, today: date) -> list[tuple]:
     # ── Generic Udupi buyers (~14 more, spread across Udupi/Malpe/Brahmavar pincodes) ─
     # Deliberately EXCLUDE any buyers near Kundapura (576201) so Scenario B has no match.
     udupi_generic: list[dict] = [
-        # shoes (non-niche) — near Udupi City
         {"cat": "shoes",     "asin": "B0SH_U002",  "name": "Canvas School Shoes",
          "lat": 13.3421, "lng": 74.7435, "pin": "576101"},
-        # footwear — near Udupi City
         {"cat": "footwear",  "asin": "B0FW_U001",  "name": "Rubber Slippers",
          "lat": 13.3398, "lng": 74.7401, "pin": "576101"},
-        # footwear — near Malpe
         {"cat": "footwear",  "asin": "B0FW_U002",  "name": "Kolhapuri Chappals",
          "lat": 13.3511, "lng": 74.7052, "pin": "576103"},
-        # phonecase — near Udupi City
         {"cat": "phonecase", "asin": "B0PC_U001",  "name": "Tempered Glass + Case Combo",
          "lat": 13.3415, "lng": 74.7453, "pin": "576101"},
-        # toy — Manipal
         {"cat": "toy",       "asin": "B0TY_U001",  "name": "Wooden Educational Toy",
          "lat": 13.3480, "lng": 74.7858, "pin": "576104"},
-        # toy — Brahmavar
         {"cat": "toy",       "asin": "B0TY_U002",  "name": "Puzzle Set",
          "lat": 13.4271, "lng": 74.7449, "pin": "576213"},
-        # book — Udupi City
         {"cat": "book",      "asin": "B0BK_U001",  "name": "Tulu Cultural Heritage",
          "lat": 13.3402, "lng": 74.7438, "pin": "576101"},
-        # book — Manipal
         {"cat": "book",      "asin": "B0BK_U002",  "name": "Kannada Novel",
          "lat": 13.3495, "lng": 74.7880, "pin": "576104"},
-        # backpack — Malpe
         {"cat": "backpack",  "asin": "B0BP_U001",  "name": "School Backpack",
          "lat": 13.3500, "lng": 74.7031, "pin": "576103"},
-        # bag — Brahmavar
         {"cat": "bag",       "asin": "B0BG_U001",  "name": "Jute Tote Bag",
          "lat": 13.4285, "lng": 74.7462, "pin": "576213"},
-        # shoes niche — Brahmavar (second buyer for niche shoe, different station)
         {"cat": "shoes",     "asin": UDUPI_NICHE_SHOE_ASIN, "name": "Niche Artisan Shoes",
          "lat": 13.4268, "lng": 74.7471, "pin": "576213"},
-        # footwear — Karkala
         {"cat": "footwear",  "asin": "B0FW_U001",  "name": "Rubber Slippers",
          "lat": 13.2172, "lng": 74.9941, "pin": "574104"},
-        # phonecase — Manipal
         {"cat": "phonecase", "asin": "B0PC_U001",  "name": "Tempered Glass + Case Combo",
          "lat": 13.3487, "lng": 74.7862, "pin": "576104"},
-        # watch — Udupi City (Karkala station area)
         {"cat": "watch",     "asin": "B0WT001",    "name": "Analog Wrist Watch",
          "lat": 13.3431, "lng": 74.7448, "pin": "576101"},
     ]
@@ -236,11 +220,10 @@ def _seed_udupi(rng: random.Random, today: date) -> list[tuple]:
 # ── Main seed function ────────────────────────────────────────────────────────
 
 def seed() -> None:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     rng = random.Random(42)  # fixed seed → reproducible
     today = date(2026, 6, 14)
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = core_db.get_connection(row_factory=False)
     cur = conn.cursor()
     _schema(cur)
 
@@ -266,7 +249,7 @@ def seed() -> None:
     conn.close()
 
     # ── Row counts by region ──────────────────────────────────────────────────
-    conn2 = sqlite3.connect(DB_PATH)
+    conn2 = core_db.get_connection(row_factory=False)
     for region in ("bengaluru", "udupi"):
         n = conn2.execute(
             "SELECT COUNT(*) FROM pending_orders WHERE region = ?", (region,)
@@ -278,7 +261,7 @@ def seed() -> None:
     print(f"  DB written to: {DB_PATH}")
     print()
     print("Udupi demo scenario buyer check:")
-    conn3 = sqlite3.connect(DB_PATH)
+    conn3 = core_db.get_connection(row_factory=False)
     demo_a = conn3.execute(
         "SELECT order_id, buyer_lat, buyer_lng, buyer_pincode FROM pending_orders WHERE order_id = 'UORD_DEMO_A'"
     ).fetchone()

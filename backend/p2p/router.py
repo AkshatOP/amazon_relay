@@ -1,51 +1,29 @@
-"""P2P Resale Exchange — FastAPI on port 8200.
+"""P2P APIRouter — thin wrappers over the P2P resale-exchange domain functions.
 
-Endpoints (all read-through, never raise):
-  GET  /health
-  GET  /nudge/{purchase_id}?simulate_years=2.0     → resale nudge notification
-  POST /list                                         → create/update listing (post-grade)
-  GET  /listing/{listing_id}                         → get listing + health card
-  POST /demand/find                                  → find nearby buyers for listing
-  POST /demand/generate                              → seed synthetic demand (demo button)
-  POST /handoff                                      → compute A→station→B logistics + green credits
-  GET  /purchases                                    → list all purchases (for demo picker)
-
-Run: uvicorn p2p.p2p_api:app --reload --port 8200
+Mounted under the /p2p prefix by backend/main.py. Endpoints (all read-through, never raise):
+  GET  /p2p/purchases                       — list purchases (demo picker)
+  GET  /p2p/nudge/{purchase_id}             — time-triggered resale nudge (?simulate_years=)
+  POST /p2p/list                            — create/update listing (post-grade) + Health Card
+  GET  /p2p/listing/{listing_id}            — fetch a listing
+  POST /p2p/demand/find                     — find nearby buyers
+  POST /p2p/demand/generate                 — seed synthetic demand (demo button)
+  POST /p2p/handoff                         — A→station→B logistics + seller payout
 """
 from __future__ import annotations
 
 import datetime
-import sqlite3
 from typing import Optional
 
-from fastapi import FastAPI, Query
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
-from .config import P2P_DB_PATH
+from backend.core import db as core_db
 from .notifier import build_resale_nudge
 from .listing import create_listing
 from .demand import find_nearby_demand, generate_demand
 from .handoff import compute_handoff
 
-app = FastAPI(title="Amazon Relay — P2P Resale Exchange", version="1.0.0")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _get_conn() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(P2P_DB_PATH))
-    conn.row_factory = sqlite3.Row
-    return conn
+router = APIRouter(prefix="/p2p", tags=["p2p"])
 
 
 # ---------------------------------------------------------------------------
@@ -81,16 +59,11 @@ class HandoffRequest(BaseModel):
 # Endpoints
 # ---------------------------------------------------------------------------
 
-@app.get("/health")
-def health():
-    return {"status": "ok", "service": "p2p", "port": 8200}
-
-
-@app.get("/purchases")
+@router.get("/purchases")
 def list_purchases():
     """List all purchases for the demo picker UI."""
     try:
-        conn = _get_conn()
+        conn = core_db.get_connection()
         rows = conn.execute("""
             SELECT p.*, u.name as user_name, u.lat as user_lat, u.lng as user_lng
             FROM purchases p
@@ -103,14 +76,14 @@ def list_purchases():
         return {"error": str(exc), "purchases": []}
 
 
-@app.get("/nudge/{purchase_id}")
+@router.get("/nudge/{purchase_id}")
 def get_nudge(
     purchase_id: int,
     simulate_years: Optional[float] = Query(default=None),
 ):
     """Step 1 — Time-triggered resale nudge for a purchase."""
     try:
-        conn = _get_conn()
+        conn = core_db.get_connection()
         row = conn.execute(
             "SELECT p.*, u.name as user_name FROM purchases p "
             "LEFT JOIN users u ON u.id = p.user_id "
@@ -146,14 +119,14 @@ def get_nudge(
     return nudge
 
 
-@app.post("/list")
+@router.post("/list")
 def post_listing(req: ListRequest):
     """Step 2 — Create/update listing after item has been graded.
 
     age_years is computed from purchase_date (or simulate_years for demo).
     """
     try:
-        conn = _get_conn()
+        conn = core_db.get_connection()
         row = conn.execute(
             "SELECT purchase_date FROM purchases WHERE id = ?", (req.purchase_id,)
         ).fetchone()
@@ -183,11 +156,11 @@ def post_listing(req: ListRequest):
     )
 
 
-@app.get("/listing/{listing_id}")
+@router.get("/listing/{listing_id}")
 def get_listing(listing_id: int):
     """Get a listing with full health card data."""
     try:
-        conn = _get_conn()
+        conn = core_db.get_connection()
         row = conn.execute("SELECT * FROM listings WHERE id = ?", (listing_id,)).fetchone()
         conn.close()
     except Exception as exc:
@@ -201,13 +174,13 @@ def get_listing(listing_id: int):
     return d
 
 
-@app.post("/demand/find")
+@router.post("/demand/find")
 def post_demand_find(req: DemandFindRequest):
     """Step 3 — Find nearby buyers for a listing."""
     return find_nearby_demand(req.listing_id)
 
 
-@app.post("/demand/generate")
+@router.post("/demand/generate")
 def post_demand_generate(req: DemandGenerateRequest):
     """Demo button — seed synthetic demand and find buyers."""
     result = generate_demand(req.listing_id)
@@ -219,11 +192,11 @@ def post_demand_generate(req: DemandGenerateRequest):
     return result
 
 
-@app.post("/handoff")
+@router.post("/handoff")
 def post_handoff(req: HandoffRequest):
-    """Step 4 — Compute A→station→B logistics + CO₂ + green credits."""
+    """Step 4 — Compute A→station→B logistics + seller payout."""
     try:
-        conn = _get_conn()
+        conn = core_db.get_connection()
         listing = conn.execute(
             "SELECT asking_price, station_id, region FROM listings WHERE id = ?",
             (req.listing_id,)

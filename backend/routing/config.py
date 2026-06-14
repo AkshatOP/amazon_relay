@@ -3,15 +3,19 @@
 Tune the reverse-logistics economics here; nothing downstream hardcodes these. Swapping the
 demo from a metro to a tier-3 city is mostly a matter of editing seed_locations.py (distances)
 — the cost/CO2 physics in this file stay the same.
+
+The DATABASE path comes from backend.core.config (the ONE consolidated relay.db). The model
++ training-CSV artifacts stay package-local under backend/routing/model/.
 """
 from __future__ import annotations
 
 from pathlib import Path
 
+from backend.core.config import DB_PATH  # the ONE consolidated database
+
 # --- Paths -------------------------------------------------------------------
 ROUTING_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = ROUTING_DIR.parent
-DB_PATH = ROUTING_DIR / "db" / "relay_routing.db"
+PROJECT_ROOT = ROUTING_DIR.parent.parent
 MODEL_PATH = ROUTING_DIR / "model" / "router_model.pkl"
 TRAINING_CSV = ROUTING_DIR / "model" / "training_data.csv"
 

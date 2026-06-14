@@ -4,8 +4,8 @@ The Health Card is assembled here because Phase 4 (Product Health Card) was neve
 separate module. All information needed for the buyer-facing card is available to P2P at the
 point of listing creation — original bill, grading result, warranty, and age.
 
-A listing in the relay_p2p.db `listings` table is the authoritative record that demand
-matching and handoff logistics both operate against.
+A listing in the consolidated relay.db `listings` table is the authoritative record that
+demand matching and handoff logistics both operate against.
 """
 from __future__ import annotations
 

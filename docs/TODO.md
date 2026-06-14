@@ -106,8 +106,40 @@ Key numbers (simulate_years=2.0, grade B, warranty 5yr):
       smartphone, backpack.
 - [x] `p2p/pricing.py` — AGE_VALUE_FLOOR aligned to match (22 entries).
 
-## Progress: Phases 1, 3, 3b, and 5 complete (~85% of MVP scope).
-Phase 1: visual grading agent (live-tested). Phase 3: geo-routing API on :8100 with corrected
-logistics-arbitrage framing (returns = new units, full-path cost includes reship leg, no
-age/depreciation). Hard gates work. XGBoost needs one retrain on the new training_data.csv.
-Phase 2 hybrid answer-merge and Phase 4 remain.
+## ✅ Phase 6 — Backend consolidation (DONE)
+Merged the three independent apps (grading :8000, routing :8100, p2p :8200) into ONE FastAPI
+backend on a single port (:8000), one SQLite db, one shared config/Gemini loader — without
+rewriting any business logic. Verified: identical numbers to the pre-merge services.
+
+What moved / changed:
+- Old top-level `backend/` (grading) → `backend/grading/`. `routing/` → `backend/routing/`.
+  `p2p/` → `backend/p2p/`. The old top-level `routing/` and `p2p/` dirs are deleted.
+- NEW `backend/core/`: `config.py` (one .env loader: GEMINI_API_KEY/MODEL, DB_PATH, paths),
+  `gemini.py` (one Gemini client/key loader — grading + routing explainer reuse it),
+  `db.py` (one `get_connection()` → `backend/data/relay.db`).
+- NEW `backend/main.py`: single FastAPI app; `include_router()` for 3 thin domain routers
+  (`<domain>/router.py`); aggregate `GET /health`; serves grading UI at `/`.
+- Routing's decision logic `routing/router.py` → `backend/routing/router_logic.py` (renamed so
+  the API "router" name is free). `routing/route_api.py` + `p2p/p2p_api.py` → thin
+  `backend/routing/router.py` + `backend/p2p/router.py` (prefix `/p2p`).
+- ONE db `backend/data/relay.db` (was `routing/db/relay_routing.db` + `p2p/db/relay_p2p.db`).
+  Seeders moved to `backend/seed/{seed_routing,seed_p2p,seed_all}.py` + `backend/seed/README.md`.
+- Killed the HTTP hop: `/grade-and-route` no longer proxies to a separate grading service.
+- Scoped configs kept per domain; only shared infra moved to core. Domains never import each
+  other (module-boundary rules written in `backend/README.md` + `CLAUDE.md`).
+- Demo UIs: base URLs updated to `:8000` (routing) and `:8000/p2p` (p2p); grading UI relative.
+- `.gitignore` → `backend/data/*.db` + `backend/routing/model/*`. `requirements.txt` httpx note
+  updated (now OSRM-only). Model NOT retrained; `.pkl` moved and loads fine.
+
+New run/seed commands:
+```
+python -m backend.seed.seed_all      # build backend/data/relay.db
+uvicorn backend.main:app --reload    # one port; /docs has all 12 endpoints
+```
+
+## Progress: Phases 1, 3, 3b, 5, and 6 complete (~88% of MVP scope).
+Phase 1: visual grading agent (live-tested). Phase 3/3b: geo-routing with logistics-arbitrage
+framing (returns = new units, full-path cost includes reship leg, no age/depreciation), two
+regions. Phase 5: P2P resale exchange (4-step flow, 22-category lifespan table). Phase 6: all
+three unified under one backend on :8000 with one db + one Gemini loader. Hard gates work;
+XGBoost loads. Phase 2 hybrid answer-merge and Phase 4 (standalone Health Card) remain.

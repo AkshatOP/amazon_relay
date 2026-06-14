@@ -3,6 +3,8 @@
 Loads the grading skill as a Gemini system instruction, sends labelled reference +
 inspection image groups to the VLM, and parses strict JSON defensively so the API never
 500s on a model formatting hiccup.
+
+The Gemini client + SDK come from backend.core.gemini (the single shared loader).
 """
 from __future__ import annotations
 
@@ -15,13 +17,8 @@ from pathlib import Path
 from . import config
 from .schemas import GradeResult, make_error_result
 
-# --- Gemini SDK (import lazily-friendly) -------------------------------------
-try:
-    from google import genai
-    from google.genai import types
-except Exception:  # pragma: no cover - surfaced as a clear runtime error instead
-    genai = None
-    types = None
+# Single shared Gemini loader (SDK objects + client builder).
+from backend.core import gemini as gemini_core
 
 
 @lru_cache(maxsize=1)
@@ -38,28 +35,13 @@ def _load_skill() -> str:
         )
 
 
-@lru_cache(maxsize=1)
-def _client():
-    """Build a cached google-genai client. Raises if the SDK/key is unavailable."""
-    if genai is None:
-        raise RuntimeError(
-            "google-genai SDK not installed. Run: pip install -r requirements.txt"
-        )
-    if not config.has_api_key():
-        raise RuntimeError(
-            "GEMINI_API_KEY is not set. Export it or put it in a .env file."
-        )
-    # The client reads GEMINI_API_KEY from the env; pass explicitly to be safe.
-    return genai.Client(api_key=config.GEMINI_API_KEY)
-
-
 def _image_part(path: str):
     """Read an image file into a Gemini inline image Part."""
     data = Path(path).read_bytes()
     mime, _ = mimetypes.guess_type(path)
     if not mime or not mime.startswith("image/"):
         mime = "image/jpeg"
-    return types.Part.from_bytes(data=data, mime_type=mime)
+    return gemini_core.types.Part.from_bytes(data=data, mime_type=mime)
 
 
 def _build_contents(
@@ -142,20 +124,20 @@ def _is_transient(err: Exception) -> bool:
     return any(m.lower() in msg for m in _TRANSIENT_MARKERS)
 
 
-def _call_gemini(contents: list, max_retries: int = 3) -> str:
+def _call_gemini(contents: list, max_retries: int = config.MAX_GRADE_RETRIES) -> str:
     """Single Gemini call returning raw text.
 
     Retries transient API errors (503 high-demand, 429 rate limit, timeouts) with simple
     backoff so a momentary spike doesn't break a live demo. Raises on non-transient errors
     or once retries are exhausted.
     """
-    client = _client()
+    client = gemini_core.get_client()
     last_err: Exception | None = None
     for attempt in range(max_retries):
         try:
             resp = client.models.generate_content(
                 model=config.GEMINI_MODEL,
-                config=types.GenerateContentConfig(
+                config=gemini_core.types.GenerateContentConfig(
                     system_instruction=_load_skill(),
                     response_mime_type="application/json",
                 ),
