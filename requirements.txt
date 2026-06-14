@@ -12,3 +12,6 @@ scikit-learn>=1.4.0    # train/test split + metrics
 pandas>=2.2.0          # training CSV loading
 numpy>=1.26.0          # feature vectors
 joblib>=1.3.0          # model (de)serialization
+
+# Grading skill is a YAML file (loaded by backend/grading/grading_agent.py)
+pyyaml>=6.0

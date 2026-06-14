@@ -1,7 +1,7 @@
 # Agent: Condition Grading Agent
 
 > Spec for the first-stage agent in the Amazon Relay pipeline. The runtime system prompt /
-> rubric this agent loads lives in [`skills/grading_skill.md`](../skills/grading_skill.md).
+> rubric this agent loads lives in [`skills/grading_skill.yaml`](../skills/grading_skill.yaml).
 
 ## Role
 A recommerce condition grader for Amazon Relay. It decides how worn a returned product is

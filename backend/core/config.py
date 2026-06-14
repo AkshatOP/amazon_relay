@@ -36,7 +36,7 @@ FRONTEND_ROUTING_DIR = PROJECT_ROOT / "frontend_routing"
 FRONTEND_P2P_DIR = PROJECT_ROOT / "frontend_p2p"
 
 # Grading skill / rubric (loaded by the grading agent as a system instruction).
-SKILL_PATH = PROJECT_ROOT / "skills" / "grading_skill.md"
+SKILL_PATH = PROJECT_ROOT / "skills" / "grading_skill.yaml"
 
 # --- Gemini (shared by grading agent + routing explainer) --------------------
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")

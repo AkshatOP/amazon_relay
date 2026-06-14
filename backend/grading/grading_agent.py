@@ -14,6 +14,8 @@ import time
 from functools import lru_cache
 from pathlib import Path
 
+import yaml
+
 from . import config
 from .schemas import GradeResult, make_error_result
 
@@ -21,18 +23,35 @@ from .schemas import GradeResult, make_error_result
 from backend.core import gemini as gemini_core
 
 
+def _render_skill(doc: dict) -> str:
+    """Render the structured grading skill (title + ordered sections) into the plain-text
+    system instruction the VLM receives. Sections are emitted in file order."""
+    parts: list[str] = []
+    title = doc.get("title")
+    if title:
+        parts.append(str(title))
+        parts.append("")
+    for section in doc.get("sections", []) or []:
+        heading = section.get("heading")
+        if heading:
+            parts.append(str(heading))
+        body = section.get("body")
+        if body:
+            parts.append(str(body).rstrip())
+        parts.append("")  # blank line between sections
+    return "\n".join(parts).strip() + "\n"
+
+
 @lru_cache(maxsize=1)
 def _load_skill() -> str:
-    """Read skills/grading_skill.md once and cache it."""
-    try:
-        return config.SKILL_PATH.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        return (
-            "You are the Amazon Relay condition grading agent. Compare the reference "
-            "(good) images to the inspection (returned) images and output ONLY a JSON "
-            "object with keys: grade, score, confidence, defects, resale_eligible, "
-            "refurbish_recommended, reasoning, notes. No code fences, no prose."
-        )
+    """Load + render skills/grading_skill.yaml. The skill MUST load — there is NO fallback
+    stub. A missing/empty/invalid file raises (loud, intentional) so grading never runs on a
+    degraded instruction. The path is package-relative (cwd-independent) via core config."""
+    text = config.SKILL_PATH.read_text(encoding="utf-8")  # FileNotFoundError if absent → raises
+    doc = yaml.safe_load(text)
+    if not isinstance(doc, dict) or not doc.get("sections"):
+        raise ValueError(f"Grading skill at {config.SKILL_PATH} is empty or malformed.")
+    return _render_skill(doc)
 
 
 def _image_part(path: str):

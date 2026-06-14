@@ -7,7 +7,7 @@
 - [x] .agents specs
 
 ## ✅ Phase 1 — Visual Grading Agent (DONE, live-tested)
-- [x] grading_skill.md written
+- [x] grading_skill.yaml written
 - [x] grading_agent.py calling Gemini VLM with reference + inspection images
 - [x] schemas.py strict JSON validation + defensive fence-stripping
 - [x] POST /grade endpoint working
@@ -93,7 +93,7 @@ Run: `python -m routing.model.generate_training_data && python -m routing.model.
 ### FUTURE WORK (intentionally deferred — to do when we work on this properly)
 The reference image is currently used as **design context** for the VLM, NOT a pixel-diff /
 similarity target (a studio shot vs a phone photo always differ in lighting/angle/background;
-`skills/grading_skill.md` already says those differences are not defects). When refined:
+`skills/grading_skill.yaml` already says those differences are not defects). When refined:
 multi-angle references, exact-SKU colourway matching, background masking, and possibly a
 structured "expected parts present?" check derived from the reference. See
 `backend/grading/catalog.py` docstring.

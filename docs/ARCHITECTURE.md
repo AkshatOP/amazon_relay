@@ -53,7 +53,7 @@ laptop/headphones/camera/appliance (hybrid).
 ### Condition Grading Agent (visual) — `backend/grading/grading_agent.py`
 The hero. `grade_visual(reference_image_paths, inspection_image_paths, category)`
 (builds its Gemini call via the shared `backend/core/gemini.py` client):
-1. Loads `skills/grading_skill.md` as the Gemini **system instruction**.
+1. Loads `skills/grading_skill.yaml` as the Gemini **system instruction**.
 2. Reads image bytes; builds a multimodal request with **clearly labelled groups** — a text
    part marking the reference set as **"catalog, context only"**, then the reference image
    parts, then a text part marking the inspection set as **"returned item — grade this"**,
@@ -69,7 +69,7 @@ The hero. `grade_visual(reference_image_paths, inspection_image_paths, category)
 6. Non-transient Gemini errors (bad key, exhausted retries) are caught and returned as clear
    structured errors.
 
-**Grading philosophy (in `skills/grading_skill.md`):** the reference is *design context only*,
+**Grading philosophy (in `skills/grading_skill.yaml`):** the reference is *design context only*,
 not a similarity target. Catalog-vs-phone differences (colour, angle, lighting, background,
 colourway) are explicitly **not** defects. The agent inspects functional/closure components
 first (a broken zipper blocks resale even on a cosmetically clean item), then surfaces for

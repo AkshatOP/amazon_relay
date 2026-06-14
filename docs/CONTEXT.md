@@ -177,5 +177,5 @@ original bill trust anchor, age, and price breakdown into a buyer-facing card.
 ## Output contract (uniform across all grading paths)
 
 Regardless of visual / functional / hybrid, the grade is emitted as the **same strict JSON**
-(see `skills/grading_skill.md` and `backend/grading/schemas.py`) so the downstream router
+(see `skills/grading_skill.yaml` and `backend/grading/schemas.py`) so the downstream router
 never has to care which path was used.

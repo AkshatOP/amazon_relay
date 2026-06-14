@@ -78,7 +78,7 @@ amazon-relay/
 ├── frontend/            # legacy grading demo UI (served at /)
 ├── frontend_routing/    # legacy routing demo UI (static)
 ├── frontend_p2p/        # legacy p2p demo UI (static)
-├── skills/          # grading_skill.md — the runtime rubric
+├── skills/          # grading_skill.yaml — the runtime rubric
 ├── docs/            # CONTEXT, ARCHITECTURE, TODO
 └── sample_images/
 ```
