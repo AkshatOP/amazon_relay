@@ -37,13 +37,22 @@ hundreds of km to a warehouse and being liquidated at a loss, Relay:
 | Phase 3b | Udupi tier-3 multi-region | ✅ complete |
 | Phase 4 | Product Health Card (standalone) | ⚪ not built as separate module |
 | Phase 5 | P2P Resale Exchange | ✅ complete, API live |
+| Phase 6 | Unified backend (one app/port/db) | ✅ complete |
+| Phase 7 | React frontend + UX (catalog ref, hold-at-RCC, intercept, animated map) | ✅ complete |
 
 Health Card is built inside Phase 5 — `backend/p2p/listing.py::build_health_card()` assembles
 it at listing creation time, which is the natural moment when all data is available.
 
-> **Phase 6 (packaging):** grading, routing, and P2P now run inside ONE FastAPI backend on a
-> single port (`:8000`) backed by one SQLite database (`backend/data/relay.db`). The three
-> domains stay self-contained sub-packages under `backend/`; see `backend/README.md`.
+> **Phase 6 (packaging):** grading, routing, and P2P run inside ONE FastAPI backend on a single
+> port (`:8000`) backed by one SQLite database (`backend/data/relay.db`). The three domains stay
+> self-contained sub-packages under `backend/`; see `backend/README.md`.
+>
+> **Phase 7 (frontend + UX):** the primary UI is the React app `frontend_react/` (Vite, Tailwind,
+> framer-motion, Leaflet). Added: ASIN→catalog reference image (auto-supplied to grading and
+> shown on cards), a map pickup-location picker with the RCC/FC/station network marked + region
+> auto-detect, the **hold-at-RCC** flow (an A/B item with no buyer waits for the 1–2 day window;
+> "skip 2 days" → FC storage, or pick a buyer → a **dynamic intercept-vs-FC decision** from real
+> distances), an animated route-draw map, P2P "thinking" pacing, and a real `/metrics` dashboard.
 
 ---
 

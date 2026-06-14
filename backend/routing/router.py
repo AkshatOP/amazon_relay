@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from backend.core import db as core_db
 from . import config
 from .explainer import explain_decision
-from .router_logic import route_return
+from .router_logic import route_return, intercept_decision
 from .seed_locations import ACTIVE_REGION, REGIONS
 
 router = APIRouter(tags=["routing"])
@@ -49,6 +49,17 @@ class GradeAndRouteRequest(BaseModel):
     order_meta: OrderMeta
     # Pre-supplied grade. Image grading goes through POST /grade (multipart) in the same app.
     grade_json: Optional[dict[str, Any]] = Field(default=None)
+
+
+class InterceptRequest(BaseModel):
+    """A held resale-eligible unit at the RCC + an explicit buyer location → intercept vs FC."""
+    region: Optional[str] = None
+    category: str = "footwear"
+    original_price: float = 2000
+    customer_lat: float
+    customer_lng: float
+    buyer_lat: float
+    buyer_lng: float
 
 
 # --- Decision logging --------------------------------------------------------
@@ -118,3 +129,16 @@ def grade_and_route(req: GradeAndRouteRequest):
     routing["grade_source"] = "supplied"
     _log_decision(meta, grade_json, routing)
     return routing
+
+
+@router.post("/route/intercept")
+def route_intercept(req: InterceptRequest):
+    """A resale-eligible unit is held at the RCC; a buyer is chosen on the map. Decide
+    dynamically (from real road distances) whether to intercept locally or ship to the FC."""
+    region_raw = (req.region or "").strip().lower()
+    region = region_raw if region_raw in REGIONS else None
+    return intercept_decision(
+        region=region, category=req.category, original_price=req.original_price,
+        customer_lat=req.customer_lat, customer_lng=req.customer_lng,
+        buyer_lat=req.buyer_lat, buyer_lng=req.buyer_lng,
+    )

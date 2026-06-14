@@ -218,17 +218,38 @@ All endpoints are served by one app (`uvicorn backend.main:app`) on **:8000**:
 
 | Method | Path | Domain |
 |--------|------|--------|
-| GET  | `/health` | app (aggregates all three) |
-| GET  | `/` | serves the grading demo UI |
-| POST | `/grade`, `/grade/functional` | grading |
+| GET  | `/health` · `/metrics` | app (aggregates all three; metrics = lifetime CO₂/₹ saved + active listings) |
+| GET  | `/` | serves the legacy grading demo UI |
+| POST | `/grade` (+`asin`), `/grade/functional` · GET `/catalog/image/{asin}` | grading |
 | POST | `/route` | routing |
 | POST | `/grade-and-route` | routing — **in-process** grade→route (no HTTP hop) |
+| POST | `/route/intercept` | routing — held unit + chosen buyer → intercept vs FC (dynamic) |
 | GET  | `/p2p/purchases`, `/p2p/nudge/{id}`, `/p2p/listing/{id}` | p2p |
 | POST | `/p2p/list`, `/p2p/demand/find`, `/p2p/demand/generate`, `/p2p/handoff` | p2p |
 
 Previously these ran as three apps on :8000/:8100/:8200 and `/grade-and-route` proxied to the
-grading service over HTTP. That HTTP hop is gone — everything is one process now. The three
-demo UIs stay separate static pages (served on :5500/:5600 and at `/`); they all call :8000.
+grading service over HTTP. That HTTP hop is gone — everything is one process now.
+
+### Frontend (Phase 7)
+The primary UI is **`frontend_react/`** — a Vite + React 18 + Tailwind + framer-motion + Leaflet
+app (one mobile-first shell, 8 screens, animated transitions). It calls `:8000` (CORS open).
+The original vanilla-JS app (`frontend_app/`) and the per-domain static pages are kept as a
+fallback. See `frontend_react/README.md`.
+
+### Catalog auto-reference (grading)
+`POST /grade` takes an optional `asin`; with no uploaded reference image the backend loads the
+catalog (good-product) photo for that ASIN — `backend/grading/catalog.py` resolves the
+`catalog` table (seeded by `seed_catalog.py`) to a file under `backend/catalog_images/<asin>.jpg`
+or an https URL. `GET /catalog/image/{asin}` serves it for the UI (404 → icon fallback); a
+missing file means grading runs reference-less. The response carries `reference_source`.
+
+### Hold-at-RCC + dynamic intercept (routing)
+A resale-eligible item (grade A/B) with no DB buyer is HELD at its nearest RCC for the 1–2 day
+window instead of going straight to the FC. `POST /route/intercept`
+(`router_logic.intercept_decision`) takes an explicit buyer location and compares, purely from
+real road distances: local intercept (RCC→buyer) vs the FC round-trip (RCC→FC + FC→buyer
+reship). `savings>0` → `RESELL_LOCAL` (reroute the held unit), else `SHIP_TO_FC`. The UI region
+is auto-detected from the picked pickup pin, so the "nearest RCC" is genuinely nearest, not fixed.
 
 ## P2P Resale Exchange (Phase 5) — `backend/p2p/`
 

@@ -6,9 +6,10 @@ All seeders and all app reads go through `backend/core/db.py`, which resolves to
 ## Commands
 
 ```bash
-python -m backend.seed.seed_all       # routing + p2p → a fresh, complete db (use this)
+python -m backend.seed.seed_all       # routing + p2p + catalog → a fresh, complete db (use this)
 python -m backend.seed.seed_routing   # routing tables only
 python -m backend.seed.seed_p2p       # p2p tables only
+python -m backend.seed.seed_catalog   # catalog table only (asin → reference image)
 ```
 
 **Wipe & rebuild from scratch:**
@@ -36,7 +37,12 @@ tables every run — so re-running is always safe and reproducible.)
 | `p2p_demand` | Buyers looking for an item. 1 pre-seeded baby-monitor buyer in Manipal. `generate_demand()` adds synthetic rows on demand. |
 | `transactions` | Reserved for completed handoffs. Starts empty. |
 
-Tables coexist in one file; routing tables and p2p tables are disjoint by name.
+### Catalog (`seed_catalog.py`)
+| Table | What it is |
+|-------|-----------|
+| `catalog` | Maps `asin → title, category, reference_image_path` — the good-product (catalog) photo used as grading reference and shown on UI product cards. 8 demo products. The image file lives at `backend/catalog_images/<asin>.jpg` (gitignored — drop it in by hand) or an https URL. A missing file is fine: grading runs reference-less. See `backend/catalog_images/README.md` for the exact filenames. |
+
+Tables coexist in one file; the routing, p2p, and catalog tables are disjoint by name.
 
 ## Reproducible demo numbers
 
@@ -60,3 +66,8 @@ Quick checks after `seed_all`:
 (`id, user_id, item_name, category, asin, original_price, purchase_date, warranty_total_years,
 has_original_bill, has_original_box, region, station_id`). Use a category present in
 `backend/p2p/lifespan_table.py` so pricing resolves cleanly. Re-run `seed_p2p`.
+
+**A reference photo for a product:** add a row to `CATALOG` in `seed_catalog.py`
+(`asin, title, category, reference_image_path`) and drop `<asin>.jpg` into
+`backend/catalog_images/`. Re-run `seed_catalog`. A value starting with `http(s)://` is
+downloaded at grade time instead of read from disk.

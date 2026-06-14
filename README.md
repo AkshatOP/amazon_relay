@@ -37,25 +37,25 @@ export GEMINI_API_KEY="your-key-here"
 python -m backend.seed.seed_all
 
 # 4. Start the single backend (from the amazon-relay/ root)
-uvicorn backend.main:app --reload
+uvicorn backend.main:app --reload          # :8000  ·  /docs has every endpoint
 
-# 5. Open the demos
-#    http://localhost:8000            → grading UI (served by the app)
-#    http://localhost:8000/docs       → Swagger for ALL endpoints
-#    python -m http.server 5500 --directory frontend_routing   → routing UI  (calls :8000)
-#    python -m http.server 5600 --directory frontend_p2p       → p2p UI      (calls :8000/p2p)
+# 5. Start the frontend (primary UI: React)
+cd frontend_react && npm install && npm run dev    # → http://localhost:5173
+#    (legacy static UIs still work as a fallback — see frontend_app/ and frontend_{routing,p2p}/)
 ```
 
 ## API (single port)
 
 | Method | Path | Body / purpose |
 |--------|------|----------------|
-| GET  | `/` | serves the grading demo UI |
-| GET  | `/health` | aggregate status across all three domains |
-| POST | `/grade` | multipart: `category`, `reference_images[]`, `inspection_images[]` |
+| GET  | `/` | serves the legacy grading demo UI |
+| GET  | `/health` · `/metrics` | aggregate status · lifetime CO₂/₹ saved + active listings |
+| POST | `/grade` | multipart: `category`, optional `asin` (auto-loads catalog ref), `reference_images[]`, `inspection_images[]` |
 | POST | `/grade/functional` | JSON: `{"category": "...", "answers": [true, false, ...]}` |
+| GET  | `/catalog/image/{asin}` | serves the product's catalog reference photo |
 | POST | `/route` | route a graded return |
 | POST | `/grade-and-route` | route a supplied `grade_json` (in-process) |
+| POST | `/route/intercept` | held-at-RCC unit + chosen buyer → intercept vs FC (dynamic) |
 | GET/POST | `/p2p/*` | nudge · list · listing · demand/find · demand/generate · handoff · purchases |
 
 `/docs` covers everything.
@@ -70,11 +70,14 @@ amazon-relay/
 │   ├── grading/     #   Phase 1 — Gemini VLM grading
 │   ├── routing/     #   Phase 3/3b — geo-routing + XGBoost
 │   ├── p2p/         #   Phase 5 — resale exchange
+│   ├── catalog_images/ # reference photos by ASIN (gitignored)
 │   ├── data/        #   relay.db (generated, gitignored)
-│   └── seed/        #   seed_routing / seed_p2p / seed_all + README
-├── frontend/            # grading demo UI (served at /)
-├── frontend_routing/    # routing demo UI (static, :5500)
-├── frontend_p2p/        # p2p demo UI (static, :5600)
+│   └── seed/        #   seed_routing / seed_p2p / seed_catalog / seed_all + README
+├── frontend_react/      # PRIMARY UI — Vite + React + Tailwind + framer-motion + Leaflet (:5173)
+├── frontend_app/        # fallback — original vanilla-JS single-page UI (superseded)
+├── frontend/            # legacy grading demo UI (served at /)
+├── frontend_routing/    # legacy routing demo UI (static)
+├── frontend_p2p/        # legacy p2p demo UI (static)
 ├── skills/          # grading_skill.md — the runtime rubric
 ├── docs/            # CONTEXT, ARCHITECTURE, TODO
 └── sample_images/

@@ -260,3 +260,60 @@ def route_return(grade_json: dict, order_meta: dict) -> dict:
             "buyer_pincode": (buyer["buyer_pincode"] if buyer else None),
         },
     }
+
+
+def intercept_decision(*, region, category, original_price,
+                       customer_lat, customer_lng, buyer_lat, buyer_lng) -> dict:
+    """Dynamic 'hold at RCC then a buyer appears' decision for a resale-eligible held unit.
+
+    The item is already collected and sitting at its nearest RCC/station. A new buyer is
+    chosen on the map. We compare, fully dynamically from the real road distances:
+      local intercept  = RCC -> buyer delivery (the held unit goes straight out)
+      full FC path     = RCC -> FC haul  +  FC -> buyer reship (a fresh unit)
+    If intercepting locally is cheaper/greener (savings > 0) -> RESELL_LOCAL to that buyer;
+    otherwise it's cheaper to fulfil from the FC -> SHIP_TO_FC. Never raises.
+    """
+    region = region if (region in ("bengaluru", "udupi")) else None
+    item_value = float(original_price or 1000)
+
+    path = customer_path(float(customer_lat), float(customer_lng), region)
+    rcc_lat, rcc_lng = _rcc_coords(path["rcc"], region)
+    buyer_km = road_km_between(rcc_lat, rcc_lng, float(buyer_lat), float(buyer_lng))
+    fc_to_buyer_km = round(path["leg2_km"] + buyer_km, 2)
+
+    full = logistics_cost_full_path(path["leg1_km"], path["leg2_km"], fc_to_buyer_km)
+    local = logistics_cost_local_intercept(path["leg1_km"], buyer_km)
+    savings = round(full["total"] - local["total"], 2)
+    co2_saved = round(full["co2_kg"] - local["co2_kg"], 4)
+    intercept = savings > 0
+    decision = "RESELL_LOCAL" if intercept else "SHIP_TO_FC"
+
+    rcc = path["rcc"]
+    if intercept:
+        reason = (f"Buyer {buyer_km:.1f} km from {rcc}; routing the held unit straight to them "
+                  f"saves Rs {savings:.0f}/item and {co2_saved:.2f} kg CO2 vs an FC haul + fresh-unit reship.")
+    else:
+        reason = (f"Buyer {buyer_km:.1f} km away; fulfilling from {path['fc']} is cheaper than "
+                  f"intercepting locally (no positive savings). Ship the held unit to the FC.")
+
+    return {
+        "decision": decision,
+        "decided_by": "intercept_calc",
+        "reason": reason,
+        "confidence": 1.0,
+        "geography": {
+            "nearest_rcc": rcc, "rcc_distance_km": path["leg1_km"],
+            "nearest_fc": path["fc"], "fc_distance_km": path["leg2_km"],
+            "node_type": path.get("node_type", "RCC"), "region": region or ACTIVE_REGION,
+        },
+        "economics": {
+            "original_price": item_value,
+            "full_path_cost": full["total"], "local_intercept_cost": local["total"],
+            "savings_inr": savings, "co2_full_kg": full["co2_kg"],
+            "co2_local_kg": local["co2_kg"], "co2_saved_kg": co2_saved,
+        },
+        "match": {
+            "buyer_found": True, "buyer_distance_km": round(buyer_km, 2),
+            "buyer_lat": float(buyer_lat), "buyer_lng": float(buyer_lng),
+        },
+    }

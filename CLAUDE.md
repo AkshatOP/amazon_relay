@@ -39,15 +39,22 @@ export GEMINI_API_KEY="..."        # or a root .env
 python -m backend.seed.seed_all    # build backend/data/relay.db
 uvicorn backend.main:app --reload  # → http://localhost:8000  (/docs covers everything)
 ```
-Demo UIs (static, each on its own port, all call :8000):
-- grading UI served by the app at `/`
-- `python -m http.server 5500 --directory frontend_routing`  (calls `:8000`)
-- `python -m http.server 5600 --directory frontend_p2p`      (calls `:8000/p2p`)
+### Frontend
+**Primary UI: `frontend_react/`** — Vite + React 18 + Tailwind + framer-motion + Leaflet (one
+mobile-first app, all 8 screens, animated). Run: `cd frontend_react && npm install && npm run dev`
+(→ :5173). See [`frontend_react/README.md`](frontend_react/README.md).
+**Fallback: `frontend_app/`** — the original vanilla-JS/CDN version (superseded; kept as backup).
+The legacy `frontend/`, `frontend_routing/`, `frontend_p2p/` static pages also still work.
+
+> **Build discipline:** do NOT run `npm run build` after each frontend edit — the user runs the
+> build once at the end. Write valid JSX and stop.
 
 ### Route map (single port)
-`GET /health` · `GET /` · `POST /grade` · `POST /grade/functional` · `POST /route` ·
-`POST /grade-and-route` · `GET /p2p/purchases` · `GET /p2p/nudge/{id}` · `POST /p2p/list` ·
-`GET /p2p/listing/{id}` · `POST /p2p/demand/find` · `POST /p2p/demand/generate` · `POST /p2p/handoff`
+`GET /health` · `GET /metrics` · `GET /` · `POST /grade` (multipart; optional `asin` auto-loads
+the catalog reference) · `POST /grade/functional` · `GET /catalog/image/{asin}` · `POST /route` ·
+`POST /grade-and-route` · `POST /route/intercept` (held unit + chosen buyer → intercept vs FC) ·
+`GET /p2p/purchases` · `GET /p2p/nudge/{id}` · `POST /p2p/list` · `GET /p2p/listing/{id}` ·
+`POST /p2p/demand/find` · `POST /p2p/demand/generate` · `POST /p2p/handoff`
 
 ## MODULE BOUNDARIES (load-bearing — keep true)
 1. **Domains never import each other's logic.** `grading ⊥ routing ⊥ p2p`. The only common
@@ -86,11 +93,27 @@ for every grading path, so the router is path-agnostic. Paths auto-selected by c
   vs FC haul + fresh-unit reship. Hard economic gates fire before XGBoost; rule-fallback if the
   `.pkl` is absent. Decision logic is `backend/routing/router_logic.py`.
 - **Multi-region**: `ACTIVE_REGION = "udupi"` in `backend/routing/seed_locations.py`. Pass
-  `"region": "bengaluru"|"udupi"` in the `/route` body. Udupi has no in-region FC — nearest is
-  the BLR cluster ~448 km over the Ghats (OSRM-verified). Real Udupi numbers: ₹59.82/item,
+  `"region": "bengaluru"|"udupi"` in the `/route` body. The frontend detects the region from the
+  picked pickup pin (nearest node across regions), so a Bengaluru pin routes to the nearest
+  Bengaluru RCC, an Udupi pin to the nearest Udupi station. Udupi has no in-region FC — nearest
+  is the BLR cluster ~448 km over the Ghats (OSRM-verified). Real Udupi numbers: ₹59.82/item,
   1.58 kg CO₂ on a ₹400 shoe.
+- **Hold-at-RCC + dynamic intercept** (`POST /route/intercept`, `router_logic.intercept_decision`):
+  a resale-eligible item with no DB buyer is HELD at the nearest RCC for the 1–2 day window
+  rather than dumped at the FC. Given an explicit buyer location it decides — fully from real
+  road distances — whether local intercept (RCC→buyer) beats the FC round-trip (RCC→FC + reship):
+  `savings>0` → RESELL_LOCAL, else SHIP_TO_FC.
 - **Retrain** (only if you change features): old `.pkl` is for the current 13-feature framing.
   `python -m backend.routing.model.generate_training_data && python -m backend.routing.model.train_router`
+
+## Grading notes — catalog auto-reference
+`POST /grade` accepts an optional `asin`; when no reference image is uploaded the backend
+auto-loads the catalog (good-product) photo for that ASIN from the `catalog` table
+(`backend/grading/catalog.py`, seeded by `backend/seed/seed_catalog.py`). Files live in
+`backend/catalog_images/<asin>.jpg` (gitignored; drop them in by hand for the demo) or an https
+URL. `GET /catalog/image/{asin}` serves the photo so the UI shows it on product cards (404 →
+icon fallback). Missing file → grading runs reference-less (never errors). Response adds
+`reference_source: uploaded|catalog|none`.
 
 ## P2P notes
 - **Two-stage pricing**: Stage-1 (pre-grade) assumes Grade C (0.40); Stage-2 uses the real
@@ -102,10 +125,13 @@ for every grading path, so the router is path-agnostic. Paths auto-selected by c
 - **Same-town handoff**: demand matched within 12 km of the seller's station; platform fee 5%.
 
 ## Status
-Phase 1 (visual agent) — complete, live-tested against real photos. Phase 3/3b (geo-routing) —
-complete, API-tested; two regions (Bengaluru metro, Udupi tier-3). Phase 5 (P2P) — complete,
-API-tested; full 4-step flow. **Phase 6 (consolidation) — complete**: one app on :8000, one
-`relay.db`, one Gemini loader, thin routers, `grade-and-route` now in-process (no HTTP hop).
-All endpoints verified on the unified app with identical numbers to the pre-merge services.
+Phase 1 (visual agent), Phase 3/3b (geo-routing, two regions), Phase 5 (P2P), Phase 6
+(unified backend on :8000) — all complete and verified. **Phase 7 — React frontend + UX**:
+`frontend_react/` is the primary UI (Vite/React/Tailwind/framer-motion/Leaflet); backend gained
+`GET /metrics`, `GET /catalog/image/{asin}`, `POST /route/intercept`, `asin`-driven catalog
+auto-reference, and handoff CO₂/green-credits; UX adds the map location picker (region
+auto-detect, RCC/FC markers + legend), the hold-at-RCC + dynamic intercept flow, an animated
+route-draw map (focus → draw pickup→RCC → fly out → draw RCC→FC), "thinking" pacing in P2P, and
+context-aware metrics (savings cards vs "normal route followed").
 
 Next: Phase 2 hybrid answer-merge. See `docs/TODO.md`.

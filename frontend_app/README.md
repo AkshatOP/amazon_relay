@@ -1,4 +1,10 @@
-# Amazon Relay — Frontend App
+# Amazon Relay — Frontend App (legacy / fallback)
+
+> **Superseded by [`frontend_react/`](../frontend_react/README.md)** (Vite + React), which is the
+> primary UI and has newer features (catalog photos on cards, the map location picker, the
+> hold-at-RCC + dynamic intercept flow, the animated route-draw map, P2P "thinking" pacing).
+> This vanilla-JS version still runs and is kept as a no-build fallback; it does **not** include
+> those newer features.
 
 One mobile-first web app (vanilla JS + Tailwind CDN + Leaflet) that wires the Stitch screens to
 the **live unified backend on `:8000`**. Every on-screen number comes from a real API response,

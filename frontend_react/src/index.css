@@ -1,0 +1,37 @@
+@import "leaflet/dist/leaflet.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body { font-family: "Inter", sans-serif; }
+
+.material-symbols-outlined { font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24; }
+.fill-icon, .material-symbols-outlined.fill { font-variation-settings: "FILL" 1; }
+
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Scanner brackets */
+@keyframes scan-bracket { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:.5;transform:scale(.95);} }
+.bracket-anim { animation: scan-bracket 2s infinite ease-in-out; }
+
+/* Circular gauge */
+.circular-progress { transform: rotate(-90deg); transform-origin: 50% 50%; }
+.gauge-arc { transition: stroke-dashoffset 1s ease-out; }
+
+/* AI pill pulse */
+@keyframes subtle-pulse { 0%{opacity:1;} 50%{opacity:.8;} 100%{opacity:1;} }
+.animate-ai-pulse { animation: subtle-pulse 2s cubic-bezier(.4,0,.6,1) infinite; }
+
+/* spinner */
+@keyframes spin { to { transform: rotate(360deg); } }
+.animate-spin { animation: spin 1s linear infinite; }
+
+/* thinking dots */
+@keyframes dot { 0%,80%,100%{opacity:.3;transform:translateY(0);} 40%{opacity:1;transform:translateY(-3px);} }
+.dot { animation: dot 1.2s infinite ease-in-out; }
+
+/* leaflet sizing */
+#leaflet-map { width: 100%; height: 100%; min-height: 320px; z-index: 0; }
+.leaflet-container { background: #e9efe9; font-family: "Inter", sans-serif; }

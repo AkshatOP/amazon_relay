@@ -155,9 +155,37 @@ python -m backend.seed.seed_all      # build backend/data/relay.db
 uvicorn backend.main:app --reload    # one port; /docs has all 12 endpoints
 ```
 
-## Progress: Phases 1, 3, 3b, 5, and 6 complete (~88% of MVP scope).
+## ✅ Phase 7 — React frontend + UX + backend extensions (DONE)
+Backend additions:
+- [x] `GET /metrics` (app-level) — lifetime CO₂/₹ saved, returns routed, decision breakdown,
+      active listings, from `returns_log` + `listings`. (Fixed `_log_decision` to write `savings_inr`.)
+- [x] `GET /catalog/image/{asin}` + `catalog` table + `seed_catalog.py` + `backend/catalog_images/`.
+      `POST /grade` accepts optional `asin` → auto-loads the catalog reference; resp adds
+      `reference_source` (uploaded|catalog|none). Missing file → grades reference-less.
+      `backend/grading/catalog.py` resolves local files / downloads https URLs.
+- [x] `POST /route/intercept` + `router_logic.intercept_decision()` — held resale-eligible unit
+      + explicit buyer location → dynamic intercept-vs-FC decision from real road distances
+      (savings>0 → RESELL_LOCAL, else SHIP_TO_FC).
+- [x] `/p2p/handoff` re-adds `co2` + `green_credits` (CO₂ saved vs a fresh-unit FC haul).
+
+Frontend (`frontend_react/` — Vite + React 18 + Tailwind + framer-motion + Leaflet; primary UI):
+- [x] Full port of all 8 screens with the exact Stitch tokens; one shell, animated transitions.
+- [x] Photo capture: drag-drop + file picker + live camera (getUserMedia) — Rider up to 4, P2P 1–5,
+      all sent to `/grade`; ASIN drives the auto catalog reference; catalog photo shown on cards.
+- [x] Map pickup-location picker — RCC + FC + delivery-station markers, legend, region auto-detect
+      from the dropped pin (so the nearest RCC is genuinely nearest, not fixed to Udupi).
+- [x] Hold-at-RCC flow on the Rider screen: A/B + no buyer → HOLD; "Skip 2 days" → FC storage;
+      "Customer" → pick buyer on map → `/route/intercept` → reroute-to-buyer or ship-to-FC.
+- [x] Animated route-draw map: focus local → draw pickup→RCC → fly out → draw RCC→FC (slow,
+      real OSRM road geometry, bold solid lines); intercept case draws pickup→RCC→buyer.
+- [x] Context-aware map metrics: savings cards when a local intercept saved money, else a
+      "Normal route followed" panel (no misleading ₹0.00).
+- [x] P2P "thinking" pacing (animated checklist + min dwell) before each step's result.
+- [x] Hub reads real `/metrics`. `frontend_app/` (vanilla) kept as a fallback.
+
+## Progress: Phases 1, 3, 3b, 5, 6, and 7 complete (~90% of MVP scope).
 Phase 1: visual grading agent (live-tested). Phase 3/3b: geo-routing with logistics-arbitrage
-framing (returns = new units, full-path cost includes reship leg, no age/depreciation), two
-regions. Phase 5: P2P resale exchange (4-step flow, 22-category lifespan table). Phase 6: all
-three unified under one backend on :8000 with one db + one Gemini loader. Hard gates work;
-XGBoost loads. Phase 2 hybrid answer-merge and Phase 4 (standalone Health Card) remain.
+framing, two regions, hold-at-RCC + dynamic intercept. Phase 5: P2P resale exchange. Phase 6:
+unified backend on :8000 (one db + one Gemini loader). Phase 7: React frontend + catalog
+auto-reference + `/metrics` + animated map + location picker. Hard gates work; XGBoost loads.
+Phase 2 hybrid answer-merge and Phase 4 (standalone Health Card) remain.

@@ -13,12 +13,12 @@ python -m backend.seed.seed_all            # build backend/data/relay.db (routin
 uvicorn backend.main:app --reload          # → http://localhost:8000   (/docs has everything)
 ```
 
-The three demo UIs are static; serve each on its own port (they call `:8000`):
+**Primary frontend** is the React app in `frontend_react/` (see its README):
 ```bash
-python -m http.server 5500 --directory frontend_routing   # routing UI  → calls :8000
-python -m http.server 5600 --directory frontend_p2p       # p2p UI      → calls :8000/p2p
-# the grading UI is served by the app itself at http://localhost:8000/
+cd frontend_react && npm install && npm run dev   # → http://localhost:5173, calls :8000
 ```
+The original static UIs still work as a fallback (`frontend_app/` vanilla; `frontend/`,
+`frontend_routing/`, `frontend_p2p/`), each served on its own port and calling `:8000`.
 
 ## Structure
 
@@ -32,17 +32,19 @@ backend/
 │   └── db.py          #   one get_connection() → backend/data/relay.db
 │
 ├── grading/           # Phase 1 — Gemini VLM condition grading
-│   ├── config.py      #   grading-scoped settings (skill path, retries); pulls shared bits from core
-│   ├── grading_agent.py / functional_grader.py / category_map.py / schemas.py   (logic, unchanged)
-│   └── router.py      #   APIRouter: POST /grade, POST /grade/functional
+│   ├── config.py      #   grading-scoped settings (skill path, retries, CATALOG_DIR)
+│   ├── grading_agent.py / functional_grader.py / category_map.py / schemas.py   (logic)
+│   ├── catalog.py     #   ASIN → reference (catalog) image resolver
+│   └── router.py      #   APIRouter: POST /grade (+asin), POST /grade/functional, GET /catalog/image/{asin}
+├── catalog_images/    # reference photos by ASIN (<asin>.jpg) — gitignored; drop them in for the demo
 │
 ├── routing/           # Phase 3 / 3b — RESELL_LOCAL / REFURBISH / DONATE / LIQUIDATE
 │   ├── config.py      #   routing-scoped constants (fuel/vehicle/radius); DB_PATH from core
 │   ├── seed_locations.py / geo.py / economics.py / pricing.py(stub)             (logic, unchanged)
-│   ├── router_logic.py#   the decision brain (hard gates + XGBoost) — renamed from old router.py
+│   ├── router_logic.py#   decision brain: hard gates + XGBoost (route_return) + intercept_decision
 │   ├── explainer.py   #   single Gemini narrative call (via core.gemini)
 │   ├── model/         #   generate_training_data.py, train_router.py, *.csv, *.pkl
-│   └── router.py      #   APIRouter: POST /route, POST /grade-and-route
+│   └── router.py      #   APIRouter: POST /route, POST /grade-and-route, POST /route/intercept
 │
 ├── p2p/               # Phase 5 — proactive resale exchange
 │   ├── config.py      #   p2p-scoped constants; P2P_DB_PATH aliases core DB_PATH
@@ -51,7 +53,7 @@ backend/
 │
 ├── data/relay.db      # the ONE consolidated database (generated, gitignored)
 └── seed/              # all seeding — writes to backend/data/relay.db (see seed/README.md)
-    ├── seed_routing.py / seed_p2p.py / seed_all.py
+    ├── seed_routing.py / seed_p2p.py / seed_catalog.py / seed_all.py
 ```
 
 ## Route map (single port, namespaced)
@@ -59,18 +61,21 @@ backend/
 | Method | Path | Domain |
 |--------|------|--------|
 | GET | `/health` | app (aggregates all three) |
-| GET | `/` | serves the grading demo UI |
-| POST | `/grade` | grading |
+| GET | `/metrics` | app — lifetime CO₂/₹ saved, returns routed, active listings (from returns_log + listings) |
+| GET | `/` | serves the legacy grading demo UI |
+| POST | `/grade` | grading — multipart; optional `asin` auto-loads the catalog reference; resp adds `reference_source` |
 | POST | `/grade/functional` | grading |
+| GET | `/catalog/image/{asin}` | grading — serves the catalog photo (404 → UI icon fallback) |
 | POST | `/route` | routing |
 | POST | `/grade-and-route` | routing (in-process; no HTTP hop) |
+| POST | `/route/intercept` | routing — held unit + chosen buyer → intercept vs FC (dynamic) |
 | GET | `/p2p/purchases` | p2p |
 | GET | `/p2p/nudge/{purchase_id}` | p2p |
 | POST | `/p2p/list` | p2p |
 | GET | `/p2p/listing/{listing_id}` | p2p |
 | POST | `/p2p/demand/find` | p2p |
 | POST | `/p2p/demand/generate` | p2p |
-| POST | `/p2p/handoff` | p2p |
+| POST | `/p2p/handoff` | p2p — returns legs, financials, **co2**, **green_credits** |
 
 `/docs` (Swagger) covers all of them.
 
