@@ -57,11 +57,56 @@
 **⚠️ Retrain required** — economic framing changed (see below). Old `.pkl` is stale.
 Run: `python -m routing.model.generate_training_data && python -m routing.model.train_router`
 
-## ⚪ Phase 4 — Trust Layer & Matching
-- [ ] Product Health Card generation
-- [ ] Nearby-buyer matching (full UI integration)
+## ✅ Phase 3b — Udupi tier-3 region (DONE)
+- [x] `routing/seed_locations.py` refactored to multi-region dict (bengaluru + udupi).
+      Backward-compat RCCS/FCS shims; ACTIVE_REGION="udupi" switches the default.
+- [x] Udupi: 6 local delivery stations that double as mini-RCC + holding (no separate RCC).
+      External FC = BLR cluster, ~400 km over Ghats. OSRM at runtime; 400 km fallback.
+- [x] `routing/geo.py` — region param on all functions; external-FC path for LOCAL_STATION
+      regions; road_km_between circuity param; measure_external_fc_osrm() utility.
+- [x] `routing/router.py` — region threaded from order_meta; node_type + holding_capacity
+      in geography response; tier3_projection suppressed for external-FC regions (real numbers
+      shown instead of synthetic 612 km).
+- [x] `routing/route_api.py` — optional region field in OrderMeta; unknown-region fallback
+      with region_note in response.
+- [x] `routing/db/seed_db.py` — region column; Bengaluru (23) + Udupi (15) rows; 5 BLR NGOs
+      + 3 Udupi NGOs; two precise demo scenarios (Scenario A: RESELL_LOCAL; Scenario B: DONATE).
+- [x] `routing/db/README_udupi_demo.md` — exact UI inputs + expected outputs for both scenarios.
+- [x] `frontend_routing/index.html` — region dropdown; Udupi presets; "Local Delivery Station"
+      label + holding capacity; Udupi money-shot uses real ~400 km numbers (no synthetic 612 km).
+- [x] No features changed → no retrain required. decided_by stays hard_gate/rule_fallback.
 
-## Progress: Phases 1 and 3 complete, framing corrected (~70% of MVP scope).
+## ⚪ Phase 4 — Trust Layer & Matching
+- [ ] Product Health Card generation (NOTE: Health Card is built inside Phase 5 P2P — listing.py::build_health_card)
+- [ ] Nearby-buyer matching (full UI integration in routing; P2P has its own demand.py)
+
+## ✅ Phase 5 — P2P Resale Exchange (DONE)
+- [x] `p2p/config.py` — all P2P constants (vehicles, CO₂ factors, green credit rate, etc.)
+- [x] `p2p/lifespan_table.py` — LIFESPAN_YEARS dict + resale_window/in_resale_window/window_position
+- [x] `p2p/pricing.py` — two-stage pricing: Stage-1 (age × C=0.40), Stage-2 (age × actual grade).
+      Grading A/B STRUCTURALLY raises price (mechanical guarantee, not a promise).
+      CONDITION_MULTIPLIER: A=0.85, B=0.65, C=0.40, D=0.15. AGE_VALUE_FLOOR per category.
+- [x] `p2p/notifier.py` — build_resale_nudge() with simulate_years demo time-travel
+- [x] `p2p/listing.py` — create_listing() + build_health_card() (Phase 4 Health Card built here)
+- [x] `p2p/demand.py` — find_nearby_demand() + generate_demand() (synthetic buyer button)
+- [x] `p2p/handoff.py` — A→station→B logistics, platform fee, seller payout
+- [x] `p2p/db/seed_p2p.py` — users, purchases (₹6000 baby monitor), demand tables; run: python -m p2p.db.seed_p2p
+- [x] `p2p/p2p_api.py` — FastAPI on port 8200: /nudge, /list, /listing, /demand/find, /demand/generate, /handoff, /purchases
+- [x] `frontend_p2p/index.html` — 4-step demo UI on port 5600
+- [x] `p2p/README_p2p_demo.md` — exact click-path + expected numbers
+
+Key numbers (simulate_years=2.0, grade B, warranty 5yr):
+  Stage-1 price: ₹6000 × 1.0 × 0.40 + warranty = ₹2,400 + ₹360 = ₹2,760
+  Stage-2 price: ₹6000 × 1.0 × 0.65 + warranty = ₹3,900 + ₹360 = ₹4,260 (▲+₹1,500 after grading)
+  Seller payout: ₹4,047 (asking ₹4,260 − 5% platform fee ₹213)
+
+## ✅ Phase 5 follow-up — lifespan table aligned to grading API (DONE)
+- [x] `p2p/lifespan_table.py` — expanded from 12 to 22 categories. All 20 grading-API
+      categories now have explicit `(min, max, avg)` entries. Extras kept: baby_monitor,
+      smartphone, backpack.
+- [x] `p2p/pricing.py` — AGE_VALUE_FLOOR aligned to match (22 entries).
+
+## Progress: Phases 1, 3, 3b, and 5 complete (~85% of MVP scope).
 Phase 1: visual grading agent (live-tested). Phase 3: geo-routing API on :8100 with corrected
 logistics-arbitrage framing (returns = new units, full-path cost includes reship leg, no
 age/depreciation). Hard gates work. XGBoost needs one retrain on the new training_data.csv.

@@ -3,40 +3,45 @@
 ## End-to-end pipeline (vision)
 
 ```
-Return initiated
-      │
-      ▼
-┌─────────────────────┐
-│  Path selection      │  category ──► get_path(category)
-│  (category_map.py)   │     │
-└─────────────────────┘     ├── "visual"  ─► Condition Grading Agent (Gemini VLM)   ◄── THIS MVP
-                            ├── "functional" ─► Functional Grader (yes/no rules)
-                            └── "hybrid"  ─► both, combined
-      │
-      ▼
-┌─────────────────────┐
-│  Grade JSON          │  { grade, score, confidence, defects, resale_eligible, ... }
-│  (uniform schema)    │
-└─────────────────────┘
-      │
-      ▼
-┌─────────────────────┐
-│  Routing Agent       │  XGBoost ─► RESELL_LOCAL / REFURBISH / DONATE / LIQUIDATE   (Phase 3)
-│  (routing-agent)     │
-└─────────────────────┘
-      │
-      ▼
-┌─────────────────────┐
-│  Trust + Matching    │  Product Health Card + nearby-buyer match                  (Phase 4)
-└─────────────────────┘
+Return initiated                          Item still owned (not returned)
+      │                                            │
+      ▼                                            ▼
+┌─────────────────────┐              ┌─────────────────────────┐
+│  Path selection      │              │  P2P Time Trigger        │  age enters resale window
+│  (category_map.py)   │              │  (p2p/notifier.py)       │  → nudge notification
+└─────────────────────┘              └─────────────────────────┘      (Phase 5)
+      │                                            │
+      ├── "visual"  ─► Grading Agent (Gemini VLM)  │
+      ├── "functional" ─► Functional Grader         │
+      └── "hybrid"  ─► both                        ▼
+      │                                  ┌──────────────────────┐
+      ▼                                  │  P2P Listing          │  Stage-2 price + Health Card
+┌─────────────────────┐                  │  (p2p/listing.py)     │
+│  Grade JSON          │                  └──────────────────────┘
+│  (uniform schema)    │                            │
+└─────────────────────┘                            ▼
+      │                                  ┌──────────────────────┐
+      ▼                                  │  Demand Match         │  same-town, 12 km radius
+┌─────────────────────┐                  │  (p2p/demand.py)      │
+│  Routing Agent       │  XGBoost ──►    └──────────────────────┘
+│  RESELL_LOCAL /      │  REFURBISH /               │
+│  DONATE / LIQUIDATE  │  etc.                       ▼
+└─────────────────────┘              ┌──────────────────────────┐
+                                     │  Handoff Logistics        │  seller→station→buyer
+                                     │  (p2p/handoff.py)         │
+                                     └──────────────────────────┘
 ```
 
-## Components in this MVP
+## Components
 
 ### Path selection — `backend/category_map.py`
-A `GRADING_PATH` dict maps product category → `"visual" | "functional" | "hybrid"`.
+A `GRADING_PATH` dict maps 20 product categories → `"visual" | "functional" | "hybrid"`.
 `get_path(category)` defaults unknown categories to `"visual"`. In production the category
 is derived from the order-history SKU; in the demo it comes from a dropdown.
+
+Categories: shoes/footwear/clothing/phone_case/bag/watch/baby_gear/toy/book (visual);
+charger/power_bank/speaker/cable/mouse/keyboard (functional);
+laptop/headphones/camera/appliance (hybrid).
 
 ### Condition Grading Agent (visual) — `backend/grading_agent.py`
 The hero. `grade_visual(reference_image_paths, inspection_image_paths, category)`:
@@ -152,10 +157,28 @@ grade_json + order_meta (no age_months)
      2–3 sentence ops/buyer-facing narrative. Templated fallback if no API key.
 ```
 
-### Geography model
+### Geography model — multi-region
 
-8 Bengaluru RCCs + 4 FCs seeded from real area centroids (approximate — marked with TODO
-for exact geocoding). `ROAD_CIRCUITY = 1.4` converts haversine → practical road distance.
+**Bengaluru (metro):** 8 RCCs + 4 FCs, seeded from real area centroids. `ROAD_CIRCUITY = 1.4`
+for haversine fallback. FC is ~22-28 km from any RCC; savings are real but modest.
+
+**Udupi (tier-3 coastal):** No dedicated RCCs and no local FC. 6 local last-mile delivery
+stations (courier franchisees / India Post hubs) double as mini-RCC + 1-2 day holding buffer
++ intercept-delivery launch point. The nearest FC is the Bengaluru cluster ~400 km over
+the Western Ghats (NH 169 + NH 75 via Shiradi Ghats). OSRM measures the real road distance
+at runtime; `road_km_default=400` is the fallback.
+
+Path for Udupi:
+```
+Customer → Local Delivery Station (acts as mini-RCC + holding)
+               ├── (intercept) → nearby buyer [deletes 400 km haul + 400 km reship]
+               └── (no buyer)  → 400 km Ghats haul → BLR FC → reship fresh unit
+```
+
+Switch region by setting `ACTIVE_REGION` in `routing/seed_locations.py` or by passing
+`"region": "udupi"` / `"region": "bengaluru"` in the `/route` request body.
+The tier-3 projection (612 km synthetic) is suppressed for Udupi — the real 400 km IS
+the tier-3 story. See `routing/db/README_udupi_demo.md` for exact demo inputs.
 
 ### Economics honesty
 
@@ -180,9 +203,86 @@ emerges from category economics — no hardcoded price thresholds.
 
 | Port | Service |
 |------|---------|
-| 8000 | Grading API (`backend/main.py`) — **never touched by routing** |
+| 8000 | Grading API (`backend/main.py`) — **never touched by routing or p2p** |
 | 8100 | Routing API (`routing/route_api.py`) |
+| 8200 | P2P Resale Exchange API (`p2p/p2p_api.py`) |
 | 5500 | Routing demo UI (`frontend_routing/index.html`) |
+| 5600 | P2P demo UI (`frontend_p2p/index.html`) |
+
+## P2P Resale Exchange (Phase 5) — `p2p/`
+
+**Decoupled from routing.** Routing and P2P never import each other. Physical constants
+(diesel rate, CO₂ factor, vehicle specs) are copied into `p2p/config.py`.
+
+### The one rule: age + condition depreciation lives ONLY here
+
+Routing treats returns as NEW units at full `original_price` (logistics arbitrage framing).
+P2P is the only module that applies `age_factor × CONDITION_MULTIPLIER[grade]` to compute
+a used-item resale price. Do not move this to routing; do not import it from routing.
+
+### Two-stage pricing
+
+```
+Stage 1 (pre-grade / nudge):
+  estimate = original_price × age_factor(category, age_years) × CONDITION_MULTIPLIER["C"]
+  Shows seller A the floor — motivates the resale decision.
+  Conservative because C=0.40 is the midpoint grade.
+
+Stage 2 (post-grade / listing):
+  final = original_price × age_factor × CONDITION_MULTIPLIER[actual_grade]
+  + warranty_bonus (2% × original_price × remaining_warranty_years)
+  Grade A (0.85) or B (0.65) > C (0.40) → price STRUCTURALLY rises vs Stage-1.
+  This is a mechanical guarantee, not a claim.
+```
+
+### Nudge trigger
+
+`notifier.build_resale_nudge()` fires when `age_years ∈ [min_years, max_years]` per
+`LIFESPAN_YEARS[category]`. `simulate_years` parameter enables demo time-travel without
+altering the DB (key for hackathon live demo — purchase_date can be today, simulated age 2yr).
+
+### P2P handoff flow
+
+```
+[Time trigger fires]
+      │
+      ▼
+Step 1: Nudge — Stage-1 price estimate sent to seller
+      │
+      ▼
+Step 2: Seller lists item (after grading) → Stage-2 price revealed + Health Card built
+      │
+      ▼
+Step 3: find_nearby_demand() — same-town buyers within P2P_DEMAND_RADIUS_KM (12 km)
+      │
+      ▼
+Step 4: compute_handoff() — seller→station→buyer, CO₂ vs buying new, green credits
+```
+
+### Financials
+
+Platform fee = 5% of asking price. Seller payout = asking_price − platform_fee.
+For the demo scenario: asking ₹4,260 → fee ₹213 → payout ₹4,047.
+
+---
+
+## P2P Lifespan table — `p2p/lifespan_table.py`
+
+22 categories with tuned `(min_years, max_years, avg_years)` resale windows, aligned to the
+grading API's 20 categories plus baby_monitor, smartphone, backpack. Examples:
+
+| Category | min | max | avg | Notes |
+|----------|-----|-----|-----|-------|
+| cable | 0.5 | 2.0 | 1.0 | connector wear; shortest window |
+| clothing | 0.5 | 2.0 | 1.0 | season/fashion sensitive |
+| shoes | 1.0 | 2.0 | 1.5 | condition > age |
+| baby_monitor | 1.5 | 3.0 | 2.0 | safety-driven upgrade cycle |
+| laptop | 3.0 | 5.0 | 4.0 | slower tech cycle |
+| watch | 4.0 | 8.0 | 5.0 | durable; mechanical holds value |
+| book | 5.0 | 20.0 | 10.0 | edition matters more than age |
+
+`age_factor = 1.0` for any item at or before `avg_years`. Decays linearly to `AGE_VALUE_FLOOR`
+(per-category, in `p2p/pricing.py`) at `max_years`.
 
 ---
 

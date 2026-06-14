@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from . import config
 from .explainer import explain_decision
 from .router import route_return
+from .seed_locations import ACTIVE_REGION, REGIONS
 
 app = FastAPI(title="Amazon Relay — Routing API", version="0.1.0")
 app.add_middleware(
@@ -38,6 +39,8 @@ class OrderMeta(BaseModel):
     # Age/depreciation pricing belongs in the future peer-to-peer exchange product.
     customer_lat: float = 12.9166
     customer_lng: float = 77.6101
+    # Optional region selector. "bengaluru" or "udupi". Defaults to ACTIVE_REGION when absent.
+    region: Optional[str] = Field(default=None, description="Routing region: 'bengaluru' or 'udupi'")
 
 
 class RouteRequest(BaseModel):
@@ -92,8 +95,15 @@ def health():
 @app.post("/route")
 def route(req: RouteRequest):
     meta = req.order_meta.model_dump()
+    region_note = None
+    region_raw = (meta.get("region") or "").strip().lower()
+    if region_raw and region_raw not in REGIONS:
+        region_note = f"Unknown region '{region_raw}'; defaulting to '{ACTIVE_REGION}'."
+        meta["region"] = None
     routing = route_return(req.grade_json, meta)
     routing["explanation"] = explain_decision(routing)
+    if region_note:
+        routing["region_note"] = region_note
     _log_decision(meta, req.grade_json, routing)
     return routing
 
@@ -104,6 +114,9 @@ async def grade_and_route(req: GradeAndRouteRequest):
     meta = req.order_meta.model_dump()
     grade_json = req.grade_json
     grade_source = "supplied"
+    region_raw = (meta.get("region") or "").strip().lower()
+    if region_raw and region_raw not in REGIONS:
+        meta["region"] = None
 
     # We can only call the grading service if we actually have images; this JSON endpoint does
     # not carry image bytes, so it expects a pre-supplied grade_json. We still ping :8000/health

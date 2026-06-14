@@ -15,6 +15,9 @@ routing/db/*.db
 routing/model/training_data.csv
 routing/model/router_model.pkl
 
+# P2P generated artifacts
+p2p/db/*.db
+
 # Uploads / temp
 uploads/
 *.tmp

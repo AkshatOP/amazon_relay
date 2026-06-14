@@ -28,6 +28,7 @@ from .economics import (
 )
 from .geo import customer_path, road_km_between
 from .model.generate_training_data import FEATURE_COLUMNS, rule_engine_decide
+from .seed_locations import ACTIVE_REGION, get_nodes, get_region
 
 GRADE_ORDINAL = {"A": 3, "B": 2, "C": 1, "D": 0}
 
@@ -44,21 +45,24 @@ def _load_model():
         return None
 
 
-def _find_nearby_buyer(category: str, asin: str, rcc_lat: float, rcc_lng: float) -> dict | None:
+def _find_nearby_buyer(category: str, asin: str, rcc_lat: float, rcc_lng: float,
+                       region: str | None = None) -> dict | None:
     """Nearest pending buyer (same category, preferring same asin) within the demand radius.
 
-    Distance is measured from the RCC where the item sits to the buyer, since a local intercept
-    delivers from that RCC. Returns None if the DB is missing or no buyer is in range.
+    Distance is measured from the node where the item sits to the buyer. Filters by region
+    so Udupi buyers are never matched to Bengaluru routes and vice versa.
+    Returns None if the DB is missing or no buyer is in range.
     """
     if not config.DB_PATH.exists():
         return None
+    active = (region or ACTIVE_REGION).strip().lower()
     try:
         conn = sqlite3.connect(config.DB_PATH)
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             "SELECT order_id, asin, buyer_lat, buyer_lng, buyer_pincode "
-            "FROM pending_orders WHERE category = ?",
-            (category.strip().lower(),),
+            "FROM pending_orders WHERE category = ? AND (region = ? OR region IS NULL)",
+            (category.strip().lower(), active),
         ).fetchall()
         conn.close()
     except Exception:
@@ -84,12 +88,12 @@ def _find_nearby_buyer(category: str, asin: str, rcc_lat: float, rcc_lng: float)
     return best
 
 
-def _rcc_coords(rcc_name: str) -> tuple[float, float]:
-    from .seed_locations import RCCS
-    for r in RCCS:
+def _rcc_coords(rcc_name: str, region: str | None = None) -> tuple[float, float]:
+    nodes = get_nodes(region)
+    for r in nodes:
         if r["name"] == rcc_name:
             return r["lat"], r["lng"]
-    return RCCS[0]["lat"], RCCS[0]["lng"]
+    return nodes[0]["lat"], nodes[0]["lng"]
 
 
 def _reason_for(decision: str, feat: dict, decided_by: str) -> str:
@@ -125,14 +129,18 @@ def route_return(grade_json: dict, order_meta: dict) -> dict:
     # Item is treated as NEW — full original price, no age/depreciation.
     item_value = float(order_meta.get("original_price", 1000) or 1000)
 
+    # Region: "bengaluru" or "udupi". Defaults to ACTIVE_REGION when absent or unknown.
+    region_raw = str(order_meta.get("region") or "").strip().lower() or None
+    region = region_raw if (region_raw in ("bengaluru", "udupi")) else None
+
     # 1. Geography
     cust_lat = float(order_meta.get("customer_lat", 12.9166))
     cust_lng = float(order_meta.get("customer_lng", 77.6101))
-    path = customer_path(cust_lat, cust_lng)
-    rcc_lat, rcc_lng = _rcc_coords(path["rcc"])
+    path = customer_path(cust_lat, cust_lng, region)
+    rcc_lat, rcc_lng = _rcc_coords(path["rcc"], region)
 
     # 2. Nearby demand
-    buyer = _find_nearby_buyer(category, asin, rcc_lat, rcc_lng)
+    buyer = _find_nearby_buyer(category, asin, rcc_lat, rcc_lng, region)
     nearby_demand = 1 if buyer else 0
     demand_distance_km = buyer["distance_km"] if buyer else 999.0
 
@@ -150,16 +158,22 @@ def route_return(grade_json: dict, order_meta: dict) -> dict:
         savings = round(full["total"] - local["total"], 2)
         co2_saved = round(full["co2_kg"] - co2_local, 4)
 
-        # Tier-3 projection: same buyer, but FC is 612 km away and reshipping costs even more.
-        t3_fc_to_buyer = round(config.WAREHOUSE_EQUIVALENT_KM + buyer["distance_km"], 2)
-        full_t3 = logistics_cost_full_path(path["leg1_km"], config.WAREHOUSE_EQUIVALENT_KM,
-                                           t3_fc_to_buyer)
-        tier3_projection = {
-            "warehouse_km": config.WAREHOUSE_EQUIVALENT_KM,
-            "local_delivery_km": buyer["distance_km"],
-            "savings_inr": round(full_t3["total"] - local["total"], 2),
-            "co2_saved_kg": round(full_t3["co2_kg"] - co2_local, 4),
-        }
+        # Tier-3 projection: only meaningful for metro regions where the FC is close.
+        # For Udupi (external FC already ~400 km), the real leg2 IS the tier-3 story —
+        # no synthetic 612 km projection needed; show the actual numbers instead.
+        rdef = get_region(region)
+        if rdef.get("external_fc"):
+            tier3_projection = None  # real FC distance is the long-haul story
+        else:
+            t3_fc_to_buyer = round(config.WAREHOUSE_EQUIVALENT_KM + buyer["distance_km"], 2)
+            full_t3 = logistics_cost_full_path(path["leg1_km"], config.WAREHOUSE_EQUIVALENT_KM,
+                                               t3_fc_to_buyer)
+            tier3_projection = {
+                "warehouse_km": config.WAREHOUSE_EQUIVALENT_KM,
+                "local_delivery_km": buyer["distance_km"],
+                "savings_inr": round(full_t3["total"] - local["total"], 2),
+                "co2_saved_kg": round(full_t3["co2_kg"] - co2_local, 4),
+            }
     else:
         # No local option — base reverse-logistics cost only (no reship leg to add).
         full = logistics_cost_full_path(path["leg1_km"], path["leg2_km"], 0.0)
@@ -224,6 +238,9 @@ def route_return(grade_json: dict, order_meta: dict) -> dict:
             "rcc_distance_km": path["leg1_km"],
             "nearest_fc": path["fc"],
             "fc_distance_km": path["leg2_km"],
+            "node_type": path.get("node_type", "RCC"),
+            "holding_capacity": path.get("holding_capacity"),
+            "region": region or ACTIVE_REGION,
         },
         "economics": {
             "original_price": item_value,
