@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useApp } from "../store";
 import { fmt } from "../lib/api";
+import { ICON_FOR } from "../lib/demoItems";
 import { Icon, ProductImg } from "../components/ui";
 import HealthCard from "../components/HealthCard";
 
@@ -49,18 +50,24 @@ export default function Shop() {
     ? { ...p2p.listing.health_card, provenance: "visual · ref:catalog", asking_price: p2p.listing.asking_price }
     : SEED_HEALTH;
 
+  // Image + icon track the ACTUAL listed unit. The live listing is built from p2p.purchase, so
+  // use that purchase's ASIN/category (e.g. a baby monitor shows its catalog photo, not the seed
+  // shoe). The photo loads via GET /catalog/image/{asin}; ProductImg falls back to the icon.
+  const unitAsin = live ? (p2p.purchase?.asin || "") : "B0SH_UDUPI_NICHE";
+  const unitIcon = live ? ICON_FOR(p2p.purchase?.category || healthCard.category) : "footprint";
+
   return (
     <section className="p-container-margin pb-stack-xl flex flex-col gap-stack-lg">
       <div>
-        <h2 className="font-headline-md text-headline-md text-on-surface">Running Shoes</h2>
-        <p className="font-body-md text-body-md text-on-surface-variant">Showing 5 results</p>
+        <h2 className="font-headline-md text-headline-md text-on-surface">Relay HUB Store</h2>
+        <p className="font-body-md text-body-md text-on-surface-variant">Verified second-life deals &amp; new arrivals</p>
       </div>
 
       {/* The ONE second-life unit — sits in the list like any product, but trust-tagged. */}
       <article className="bg-surface-container-lowest border border-primary/30 rounded-lg shadow-sm overflow-hidden">
         <div className="p-container-margin flex gap-container-margin items-start">
           <div className="relative overflow-hidden w-[84px] h-[84px] rounded bg-surface-container flex-shrink-0 border border-outline-variant/50 flex items-center justify-center text-on-surface-variant">
-            <ProductImg asin="B0SH_UDUPI_NICHE" icon="footprint" iconClass="text-[36px]" />
+            <ProductImg asin={unitAsin} icon={unitIcon} iconClass="text-[36px]" />
           </div>
           <div className="flex flex-col gap-1 flex-grow">
             <h3 className="font-headline-sm text-headline-sm text-on-surface leading-tight">{healthCard.item_name || "Trail Runner Shoes"}</h3>
