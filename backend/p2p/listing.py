@@ -89,7 +89,7 @@ def build_health_card(
         "asking_price": stage2["final_price"],
         "price_breakdown": stage2["breakdown"],
         "price_note": stage2.get("note", ""),
-        "verified_by": "Amazon Relay grading agent",
+        "verified_by": "Relay HUB grading agent",
     }
 
 

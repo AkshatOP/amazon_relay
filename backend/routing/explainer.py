@@ -10,7 +10,7 @@ from __future__ import annotations
 from backend.core import gemini as gemini_core
 
 _SYSTEM = (
-    "You are an operations analyst for Amazon Relay, a reverse-logistics system. Given a routing "
+    "You are an operations analyst for Relay HUB, a reverse-logistics system. Given a routing "
     "decision as JSON, write 2-3 short, plain-English sentences explaining WHY this is the right "
     "outcome for the returned item — mention condition, the local-buyer match (or absence), and "
     "the money/CO2 saved by skipping the long warehouse haul when relevant. No markdown, no JSON, "

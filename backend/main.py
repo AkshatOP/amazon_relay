@@ -1,4 +1,4 @@
-"""Amazon Relay — THE single FastAPI app.
+"""Relay HUB — THE single FastAPI app.
 
 One app, one port. Mounts every domain's APIRouter:
   grading  → POST /grade, POST /grade/functional
@@ -22,7 +22,7 @@ from backend.routing.router import router as routing_router
 from backend.routing import config as routing_config
 from backend.p2p.router import router as p2p_router
 
-app = FastAPI(title="Amazon Relay API", version="1.0.0")
+app = FastAPI(title="Relay HUB API", version="1.0.0")
 
 # CORS wide open for local dev / demo (the React app on :5173 calls this).
 app.add_middleware(
@@ -41,7 +41,7 @@ app.include_router(p2p_router)
 @app.get("/")
 def index():
     """API root — the UI is the React app in frontend_react/. See /docs for all endpoints."""
-    return {"service": "Amazon Relay API", "ui": "frontend_react (Vite/React)", "docs": "/docs"}
+    return {"service": "Relay HUB API", "ui": "frontend_react (Vite/React)", "docs": "/docs"}
 
 
 @app.get("/health")

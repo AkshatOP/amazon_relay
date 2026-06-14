@@ -1,4 +1,4 @@
-# Amazon Relay — Build Tracker
+# Relay HUB — Build Tracker
 
 ## ✅ Phase 0 — Scaffold & Context   [STATUS: done]
 - [x] Repo structure, requirements.txt, .env.example, README

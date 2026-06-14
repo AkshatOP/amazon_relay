@@ -1,4 +1,4 @@
-# Amazon Relay — Architecture
+# Relay HUB — Architecture
 
 > **Packaging (Phase 6):** all three domains run inside ONE FastAPI app on a single port
 > (`:8000`), backed by ONE SQLite database (`backend/data/relay.db`), with shared infra in

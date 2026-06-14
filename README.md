@@ -1,4 +1,4 @@
-# Amazon Relay
+# Relay HUB
 
 Amazon HackOn 2026 submission. An intelligent reverse-logistics system that gives
 returned/unused products a meaningful second life — **grade → route → resell/refurbish/donate/

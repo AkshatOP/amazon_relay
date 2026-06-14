@@ -1,4 +1,4 @@
-/** Amazon Relay design tokens — ported verbatim from the Stitch exports. */
+/** Relay HUB design tokens — ported verbatim from the Stitch exports. */
 export default {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   darkMode: "class",

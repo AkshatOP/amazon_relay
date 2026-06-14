@@ -1,4 +1,4 @@
-# Amazon Relay — Frontend (Vite + React)
+# Relay HUB — Frontend (Vite + React)
 
 Mobile-first React app for the unified backend (`:8000`). Replaces the vanilla
 `frontend_app/` (kept as a fallback). Same design tokens, same backend wiring, plus

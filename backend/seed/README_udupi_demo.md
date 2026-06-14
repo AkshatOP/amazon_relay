@@ -1,6 +1,6 @@
 # Udupi Tier-3 Demo Scenarios
 
-These two scenarios are the heart of the Amazon Relay story. Udupi is a coastal tier-3 town
+These two scenarios are the heart of the Relay HUB story. Udupi is a coastal tier-3 town
 with no Amazon FC on the Karnataka coast. Every FBA item ships from the Bengaluru FC cluster,
 400 km over the Western Ghats (NH 169 + NH 75 via Shiradi Ghats). Low-volume niche items
 that aren't pre-stocked regionally take 7-9 days — exactly the window in which a second order

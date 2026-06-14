@@ -1,4 +1,4 @@
-"""The single settings loader for Amazon Relay.
+"""The single settings loader for Relay HUB.
 
 Loads ONE root .env and exposes the SHARED infrastructure settings every domain needs:
 the Gemini key/model and the path to the one consolidated SQLite database.

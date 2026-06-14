@@ -1,4 +1,4 @@
-# Amazon Relay — Context
+# Relay HUB — Context
 
 ## Problem statement
 
@@ -14,7 +14,7 @@ sustainable incentives for customers; easy peer-to-peer resale inside Amazon's t
 ecosystem; predictive return prevention before a purchase is even made.
 Build the future of sustainable commerce where every product gets a meaningful second life.
 
-## Our proposed solution — Amazon Relay
+## Our proposed solution — Relay HUB
 
 An intelligent reverse-logistics system. Instead of returned/unused products travelling
 hundreds of km to a warehouse and being liquidated at a loss, Relay:

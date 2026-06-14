@@ -36,7 +36,7 @@ export default function HealthCard({ card }) {
         <HCItem k="Original bill" v={card.has_original_bill ? `Verified${card.purchase_date ? " · " + card.purchase_date : ""}` : "Not available"} />
         <HCItem k="Warranty" v={card.warranty || (card.remaining_warranty_years ? `${card.remaining_warranty_years} yr remaining` : "—")} />
         <HCItem k="Age" v={card.age_display || (card.age_years != null ? `${card.age_years} yr` : "—")} />
-        <HCItem k="Verified by" v={card.verified_by || "Amazon Relay grading AI"} />
+        <HCItem k="Verified by" v={card.verified_by || "Relay HUB grading AI"} />
       </div>
 
       {Array.isArray(card.trust_anchors) && card.trust_anchors.length > 0 && (

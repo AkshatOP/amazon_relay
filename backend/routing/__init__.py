@@ -1,4 +1,4 @@
-"""Amazon Relay — Phase 3: Smart Geo-Routing Agent.
+"""Relay HUB — Phase 3: Smart Geo-Routing Agent.
 
 Self-contained, independently-importable package. Decides the best outcome for a graded
 return (RESELL_LOCAL / REFURBISH / DONATE / LIQUIDATE) using geography + economics + XGBoost.

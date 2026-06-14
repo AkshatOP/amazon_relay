@@ -1,4 +1,4 @@
-# Amazon Relay — Unified Backend
+# Relay HUB — Unified Backend
 
 **Read this first.** One FastAPI app, one port (`:8000`), one SQLite database, three
 self-contained domains. This file is the map.

@@ -29,7 +29,7 @@ export default function Shell({ children }) {
       {/* TOP BAR */}
       <header className="h-[56px] flex-none flex items-center justify-between px-container-margin border-b border-outline-variant bg-surface sticky top-0 z-40">
         <button className="w-10 h-10 flex items-center justify-center text-primary rounded-full hover:bg-surface-container-high transition-colors" onClick={() => setOpen(true)}><Icon name="menu" /></button>
-        <h1 className="font-headline-md text-headline-md font-semibold text-primary">Amazon Relay</h1>
+        <h1 className="font-headline-md text-headline-md font-semibold text-primary">Relay HUB</h1>
         <div className="flex items-center gap-1">
           <AnimatePresence>
             {showAI && (
@@ -50,7 +50,7 @@ export default function Shell({ children }) {
             <motion.div className="fixed inset-0 bg-black/50 z-[55]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setOpen(false)} />
             <motion.nav className="fixed inset-y-0 left-0 z-[60] w-[280px] bg-surface-container-lowest shadow-xl py-stack-lg flex flex-col"
               initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }} transition={{ type: "tween", duration: 0.25 }}>
-              <div className="px-4 mb-6"><h2 className="font-headline-sm text-headline-sm font-semibold text-primary">Amazon Relay</h2>
+              <div className="px-4 mb-6"><h2 className="font-headline-sm text-headline-sm font-semibold text-primary">Relay HUB</h2>
                 <p className="font-label-md text-label-md text-on-surface-variant mt-1">Reverse logistics · resale</p></div>
               <ul className="flex flex-col gap-1">
                 {DRAWER.map((d) => {

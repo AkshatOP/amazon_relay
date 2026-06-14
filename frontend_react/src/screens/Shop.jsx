@@ -31,9 +31,9 @@ const SEED_HEALTH = {
   purchase_date: "2026-04-30",
   has_original_bill: true,
   warranty: "Brand warranty not applicable (footwear)",
-  trust_anchors: ["Original purchase bill (price & date verified)", "Graded by Amazon Relay AI"],
+  trust_anchors: ["Original purchase bill (price & date verified)", "Graded by Relay HUB AI"],
   provenance: "visual · ref:catalog · conf 1.00",
-  verified_by: "Amazon Relay grading AI",
+  verified_by: "Relay HUB grading AI",
   original_price: 2499,
   asking_price: 1299,
 };
@@ -75,7 +75,7 @@ export default function Shop() {
               <TrustTag label="Second Hand" onClick={() => setOpen((o) => !o)} />
             </div>
             <p className="font-label-md text-label-md text-on-surface-variant mt-1 flex items-center gap-1">
-              <Icon name="verified" className="text-[14px] text-primary" fill /> Graded &amp; verified by Amazon Relay AI
+              <Icon name="verified" className="text-[14px] text-primary" fill /> Graded &amp; verified by Relay HUB AI
             </p>
           </div>
         </div>

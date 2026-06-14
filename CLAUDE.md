@@ -1,9 +1,9 @@
-# CLAUDE.md — Amazon Relay
+# CLAUDE.md — Relay HUB
 
 Project guidance for Claude Code working in this repo.
 
 ## What this is
-Amazon Relay — Amazon HackOn 2026 submission. An intelligent reverse-logistics system that
+Relay HUB — Amazon HackOn 2026 submission. An intelligent reverse-logistics system that
 gives returned products a second life (resell / refurbish / donate / liquidate / P2P resale).
 **Phases 1 (grading), 3 (geo-routing), and 5 (P2P exchange) are complete and live-tested.**
 As of Phase 6, all three run inside **ONE FastAPI backend on a single port (:8000)**.

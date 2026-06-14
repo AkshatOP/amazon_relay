@@ -148,7 +148,7 @@ def _print_scenario(title: str, leg1_km: float, leg2_km: float,
 
 
 if __name__ == "__main__":
-    print("Amazon Relay routing — economics self-test (per-item, amortized).")
+    print("Relay HUB routing — economics self-test (per-item, amortized).")
     print(f"diesel=Rs{config.DIESEL_RATE_PER_L}/L, CO2={config.DIESEL_CO2_KG_PER_L} kg/L, "
           f"leg2 truck shares {config.LEG2_VEHICLE['avg_items_per_trip']} items/trip.")
     print("Full-path cost now includes the FC->buyer RESHIP leg (the fresh unit Amazon must")

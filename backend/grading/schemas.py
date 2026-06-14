@@ -1,4 +1,4 @@
-"""Pydantic models for Amazon Relay grading.
+"""Pydantic models for Relay HUB grading.
 
 The `GradeResult` is the single, uniform output shape emitted by EVERY grading path
 (visual VLM or functional rules) so the downstream router is path-agnostic.

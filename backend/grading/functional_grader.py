@@ -78,7 +78,7 @@ def _rule_grade(answers: list[bool], category: str) -> dict:
 
 
 _DESC_SYSTEM = (
-    "You are the Amazon Relay functional condition grader. You are given a product category, "
+    "You are the Relay HUB functional condition grader. You are given a product category, "
     "the ordered functional checklist with each check's weight and the inspector's pass/fail "
     "answer, a preliminary rule-based grade, and the customer's free-text condition description. "
     "Cross-check the description against the checklist and refine the grade — do not grade the "
