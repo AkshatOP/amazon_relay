@@ -11,7 +11,6 @@ from backend.core.config import (  # re-exported for callers that do `config.X`
     GEMINI_MODEL,
     REQUEST_TIMEOUT_SECONDS,
     SKILL_PATH,
-    FRONTEND_DIR,
     BACKEND_DIR,
     has_api_key,
 )
@@ -29,7 +28,6 @@ __all__ = [
     "GEMINI_MODEL",
     "REQUEST_TIMEOUT_SECONDS",
     "SKILL_PATH",
-    "FRONTEND_DIR",
     "BACKEND_DIR",
     "CATALOG_DIR",
     "has_api_key",

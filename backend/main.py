@@ -14,7 +14,6 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
 
 from backend.core import config as core_config
 from backend.core import db as core_db
@@ -25,7 +24,7 @@ from backend.p2p.router import router as p2p_router
 
 app = FastAPI(title="Amazon Relay API", version="1.0.0")
 
-# CORS wide open for local dev / demo (the three static demo UIs call this from other ports).
+# CORS wide open for local dev / demo (the React app on :5173 calls this).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -38,15 +37,11 @@ app.include_router(grading_router)
 app.include_router(routing_router)
 app.include_router(p2p_router)
 
-INDEX_HTML = core_config.FRONTEND_DIR / "index.html"
-
 
 @app.get("/")
 def index():
-    """Serve the grading demo UI for convenience (the other two UIs serve statically)."""
-    if INDEX_HTML.exists():
-        return FileResponse(INDEX_HTML)
-    return JSONResponse({"error": "frontend/index.html not found"}, status_code=404)
+    """API root — the UI is the React app in frontend_react/. See /docs for all endpoints."""
+    return {"service": "Amazon Relay API", "ui": "frontend_react (Vite/React)", "docs": "/docs"}
 
 
 @app.get("/health")
