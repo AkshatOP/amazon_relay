@@ -1,21 +1,18 @@
 /* hub.js — Screen 8 (Relay Hub / dashboard).
-   The sustainability total and listing counts have NO backend endpoint yet, so they are
-   shown as clearly-labelled placeholders — NOT fabricated as live figures.
-   // TODO: backend field — GET /metrics (lifetime CO2 saved, active-listing count) */
+   Sustainability total + listing counts come from the real GET /metrics aggregate
+   (returns_log + listings). Figures are live lifetime totals, not fabricated. */
 (function () {
   "use strict";
   const { fmt } = App;
 
   function render() {
     const host = document.getElementById("screen-hub");
-    const activeListings = App.state.p2p.listing ? 1 : 0; // only what THIS session created
     host.innerHTML = `
       <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-stack-lg shadow-sm flex items-center justify-between">
         <div class="flex flex-col">
           <p class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Sustainability Impact</p>
-          <h2 class="font-display-lg text-display-lg text-on-surface mt-1">— <span class="font-headline-sm text-headline-sm text-on-surface-variant">kg</span></h2>
-          <p class="font-body-md text-body-md text-primary mt-1">CO₂ saved this year</p>
-          <p class="font-label-md text-label-md text-on-surface-variant mt-1">placeholder · no /metrics endpoint yet</p>
+          <h2 class="font-display-lg text-display-lg text-on-surface mt-1" id="m-co2">… <span class="font-headline-sm text-headline-sm text-on-surface-variant">kg</span></h2>
+          <p class="font-body-md text-body-md text-primary mt-1">CO₂ saved · <span id="m-money">…</span> saved across <span id="m-routed">…</span> returns</p>
         </div>
         <div class="relative w-20 h-20 flex items-center justify-center">
           <svg class="w-full h-full circular-progress" viewBox="0 0 36 36">
@@ -32,7 +29,7 @@
         <button class="bg-surface-container-lowest border border-outline-variant rounded-lg p-stack-md shadow-sm flex flex-col gap-stack-sm text-left hover:bg-surface-container-low" onclick="App.router.go('p2p-handoff')">
           <div class="w-10 h-10 bg-secondary-container rounded-full flex items-center justify-center mb-1"><span class="material-symbols-outlined text-on-secondary-container fill-icon">inventory_2</span></div>
           <p class="font-label-bold text-label-bold text-on-surface">Active Listings</p>
-          <p class="font-body-md text-body-md text-primary font-bold">${activeListings} this session</p></button>
+          <p class="font-body-md text-body-md text-primary font-bold" id="m-listings">…</p></button>
       </div>
 
       <button class="bg-near-black border border-outline-variant rounded-lg p-stack-lg shadow-sm flex gap-stack-md relative overflow-hidden text-left" onclick="App.router.go('orders')">
@@ -54,6 +51,15 @@
       if (!el) return;
       if (h && h.status === "ok") el.innerHTML = `status: ok · model: ${h.model}<br/>db_ready: ${h.db_ready} · router_model: ${h.router_model_trained}`;
       else el.textContent = "backend unreachable";
+    });
+
+    App.api.metrics().then((m) => {
+      if (!m || m._networkError) return;
+      const set = (id, v) => { const e = document.getElementById(id); if (e) e.innerHTML = v; };
+      set("m-co2", `${(m.co2_saved_kg || 0).toFixed(2)} <span class="font-headline-sm text-headline-sm text-on-surface-variant">kg</span>`);
+      set("m-money", fmt.inr(m.money_saved_inr));
+      set("m-routed", m.returns_routed);
+      set("m-listings", `${m.active_listings} · ${fmt.inr(m.active_listing_value_inr)}`);
     });
   }
 

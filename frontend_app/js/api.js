@@ -53,12 +53,15 @@
   const api = {
     BASE_URL,
     health: () => call("/health"),
+    metrics: () => call("/metrics"),
+    catalogImageUrl: (asin) => BASE_URL + "/catalog/image/" + encodeURIComponent(asin || ""),
 
     // grading
-    // files: { reference: File[], inspection: File[] }
-    grade(category, files) {
+    // files: { reference: File[], inspection: File[] }; asin → auto-loads catalog reference
+    grade(category, files, asin = "") {
       const fd = new FormData();
       fd.append("category", category);
+      if (asin) fd.append("asin", asin);
       (files.reference || []).forEach((f) => fd.append("reference_images", f));
       (files.inspection || []).forEach((f) => fd.append("inspection_images", f));
       return call("/grade", { method: "POST", body: fd });

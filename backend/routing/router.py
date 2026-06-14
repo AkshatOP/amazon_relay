@@ -66,7 +66,7 @@ def _log_decision(order_meta: dict, grade_json: dict, routing: dict) -> None:
                 datetime.now(timezone.utc).isoformat(),
                 order_meta.get("order_id"), order_meta.get("asin"), order_meta.get("category"),
                 grade_json.get("grade"), routing.get("decision"), routing.get("decided_by"),
-                econ.get("resale_price"), econ.get("savings_if_local"), econ.get("co2_saved_kg"),
+                econ.get("original_price"), econ.get("savings_inr"), econ.get("co2_saved_kg"),
                 int(routing.get("match", {}).get("buyer_found", False)),
             ),
         )

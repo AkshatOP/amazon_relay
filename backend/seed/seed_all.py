@@ -7,7 +7,7 @@ Runs the routing seeder then the p2p seeder. They touch disjoint tables in the o
 """
 from __future__ import annotations
 
-from backend.seed import seed_routing, seed_p2p
+from backend.seed import seed_routing, seed_p2p, seed_catalog
 
 
 def main() -> None:
@@ -16,6 +16,9 @@ def main() -> None:
     print()
     print("Seeding p2p tables (users, purchases, listings, p2p_demand, transactions) ...")
     seed_p2p.seed()
+    print()
+    print("Seeding catalog (asin → reference image) ...")
+    seed_catalog.seed()
     print()
     print("Done — consolidated relay.db is ready.")
 

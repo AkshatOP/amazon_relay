@@ -64,6 +64,70 @@
     spinnerBtnHTML(label) {
       return `<span class="material-symbols-outlined animate-spin">autorenew</span><span>${label}</span>`;
     },
+
+    // Catalog photo for an ASIN, layered over an icon fallback. If the image 404s (no file
+    // dropped in catalog_images/ yet) it removes itself and the icon shows through.
+    // The PARENT element must be position:relative + overflow-hidden + centered.
+    productImg(asin, icon, iconSizeClass = "text-[36px]") {
+      const url = App.api.catalogImageUrl(asin);
+      return `<span class="material-symbols-outlined ${iconSizeClass}">${icon}</span>
+        <img src="${url}" alt="" class="absolute inset-0 w-full h-full object-cover" onerror="this.remove()"/>`;
+    },
+
+    // Shared live-camera capture modal (getUserMedia; works on http://localhost).
+    // onCapture(file) is called for each captured frame. Used by rider + p2p screens.
+    openCamera(onCapture) {
+      let stream = null;
+      const modal = document.createElement("div");
+      modal.id = "cam-modal";
+      modal.className = "fixed inset-0 z-[120] bg-black/90 flex flex-col items-center justify-center gap-4 p-4";
+      modal.innerHTML = `
+        <div class="w-full max-w-[400px] flex items-center justify-between text-white">
+          <span class="font-headline-sm text-headline-sm">Live capture</span>
+          <button id="cam-close" class="w-9 h-9 rounded-full hover:bg-white/10 flex items-center justify-center"><span class="material-symbols-outlined">close</span></button>
+        </div>
+        <select id="cam-device" class="w-full max-w-[400px] bg-surface-container-lowest border border-outline-variant rounded-lg p-2 font-body-md text-body-md"></select>
+        <video id="cam-video" autoplay playsinline class="w-full max-w-[400px] rounded-lg bg-black aspect-[3/4] object-cover"></video>
+        <div class="flex items-center gap-3">
+          <button id="cam-shoot" class="bg-amber-action text-near-black font-label-bold text-label-bold py-3 px-6 rounded-full flex items-center gap-2"><span class="material-symbols-outlined">camera</span> Capture</button>
+          <button id="cam-done" class="text-white/80 font-label-md text-label-md underline">Done</button>
+        </div>
+        <p class="text-white/60 font-label-md text-label-md max-w-[400px] text-center">Tip: to use your phone as the camera, connect it as a webcam (USB / IP-webcam app) and pick it in the dropdown.</p>`;
+      document.body.appendChild(modal);
+      const video = modal.querySelector("#cam-video");
+      const sel = modal.querySelector("#cam-device");
+
+      async function startStream(deviceId) {
+        if (stream) stream.getTracks().forEach((t) => t.stop());
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: "environment" }, audio: false,
+        });
+        video.srcObject = stream;
+      }
+      function close() { if (stream) stream.getTracks().forEach((t) => t.stop()); modal.remove(); }
+      function shoot() {
+        const cv = document.createElement("canvas");
+        cv.width = video.videoWidth || 720; cv.height = video.videoHeight || 960;
+        cv.getContext("2d").drawImage(video, 0, 0, cv.width, cv.height);
+        cv.toBlob((blob) => {
+          if (!blob) return;
+          onCapture(new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" }));
+          App.toast("Photo captured", "ok");
+        }, "image/jpeg", 0.9);
+      }
+      modal.querySelector("#cam-close").addEventListener("click", close);
+      modal.querySelector("#cam-done").addEventListener("click", close);
+      modal.querySelector("#cam-shoot").addEventListener("click", shoot);
+      sel.addEventListener("change", () => startStream(sel.value));
+
+      startStream(null).then(async () => {
+        const devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "videoinput");
+        sel.innerHTML = devs.map((d, i) => `<option value="${d.deviceId}">${d.label || "Camera " + (i + 1)}</option>`).join("");
+      }).catch((e) => {
+        App.toast("Camera unavailable: " + (e.message || e) + " — use drag & drop or file picker.", "err", 6000);
+        close();
+      });
+    },
   };
 
   // ---------------------------------------------------------------------
@@ -84,8 +148,8 @@
           <p class="font-body-md text-body-md text-on-surface-variant">Handed directly to resident.</p></div>
       </div>
       <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-container-margin shadow-sm flex gap-container-margin items-start">
-        <div class="w-[80px] h-[80px] rounded bg-surface-container flex-shrink-0 border border-outline-variant/50 flex items-center justify-center text-on-surface-variant">
-          <span class="material-symbols-outlined text-[36px]">${o.category === "shoes" || o.category === "footwear" ? "footprint" : "headphones"}</span>
+        <div class="relative overflow-hidden w-[80px] h-[80px] rounded bg-surface-container flex-shrink-0 border border-outline-variant/50 flex items-center justify-center text-on-surface-variant">
+          ${App.ui.productImg(o.asin, o.category === "shoes" || o.category === "footwear" ? "footprint" : "inventory_2")}
         </div>
         <div class="flex flex-col gap-stack-sm flex-grow">
           <h3 class="font-headline-sm text-headline-sm text-on-surface leading-tight">${o.product_name}</h3>
@@ -121,8 +185,8 @@
         <h2 class="font-headline-md text-headline-md">Initiate Return</h2>
       </div>
       <div class="flex gap-container-margin items-center p-3 bg-surface rounded-lg border border-outline-variant/30">
-        <div class="w-12 h-12 rounded bg-surface-container flex items-center justify-center text-on-surface-variant border border-outline-variant/50">
-          <span class="material-symbols-outlined">${isElectronic ? "headphones" : "footprint"}</span></div>
+        <div class="relative overflow-hidden w-12 h-12 rounded bg-surface-container flex items-center justify-center text-on-surface-variant border border-outline-variant/50">
+          ${App.ui.productImg(o.asin, isElectronic ? "inventory_2" : "footprint", "text-[20px]")}</div>
         <div class="font-body-md text-body-md text-on-surface font-medium">${o.product_name}</div>
       </div>
       <div class="flex flex-col gap-stack-sm">

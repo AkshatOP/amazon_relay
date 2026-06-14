@@ -80,6 +80,24 @@ Run: `python -m routing.model.generate_training_data && python -m routing.model.
 - [ ] Product Health Card generation (NOTE: Health Card is built inside Phase 5 P2P — listing.py::build_health_card)
 - [ ] Nearby-buyer matching (full UI integration in routing; P2P has its own demand.py)
 
+## ✅ Catalog auto-reference (ASIN → reference image) — DONE
+- [x] `catalog` table (seed: `backend/seed/seed_catalog.py`, run via `seed_all`) maps ASIN →
+      `reference_image_path` (a file under `backend/catalog_images/<asin>.jpg`, or an https URL).
+- [x] `backend/grading/catalog.py::reference_paths_for(asin)` resolves it (downloads URLs;
+      returns [] if the file is missing → grading runs reference-less, never errors).
+- [x] `POST /grade` accepts an optional `asin` form field; auto-loads the catalog reference when
+      no reference image is uploaded. Response adds `reference_source` = uploaded|catalog|none.
+- [x] Frontend rider + p2p screens pass the ASIN automatically → rider only sends inspection photos.
+- [x] `backend/catalog_images/` holds the studio photos (gitignored except README + .gitkeep).
+
+### FUTURE WORK (intentionally deferred — to do when we work on this properly)
+The reference image is currently used as **design context** for the VLM, NOT a pixel-diff /
+similarity target (a studio shot vs a phone photo always differ in lighting/angle/background;
+`skills/grading_skill.md` already says those differences are not defects). When refined:
+multi-angle references, exact-SKU colourway matching, background masking, and possibly a
+structured "expected parts present?" check derived from the reference. See
+`backend/grading/catalog.py` docstring.
+
 ## ✅ Phase 5 — P2P Resale Exchange (DONE)
 - [x] `p2p/config.py` — all P2P constants (vehicles, CO₂ factors, green credit rate, etc.)
 - [x] `p2p/lifespan_table.py` — LIFESPAN_YEARS dict + resale_window/in_resale_window/window_position

@@ -14,14 +14,27 @@ from pathlib import Path
 from typing import List
 
 from fastapi import APIRouter, File, Form, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from .category_map import get_path
+from .catalog import reference_paths_for
 from .functional_grader import grade_functional
 from .grading_agent import grade_visual
 from .schemas import FunctionalGradeRequest
 
 router = APIRouter(tags=["grading"])
+
+
+@router.get("/catalog/image/{asin}")
+def catalog_image(asin: str):
+    """Serve the catalog (reference) image for an ASIN so the UI can display it.
+
+    Returns 404 (JSON) when no reference image is on file — the frontend falls back to an icon.
+    """
+    paths = reference_paths_for(asin)
+    if not paths:
+        return JSONResponse({"error": f"no reference image for asin '{asin}'"}, status_code=404)
+    return FileResponse(paths[0])
 
 
 def _save_uploads(files: List[UploadFile], dest_dir: Path) -> list[str]:
@@ -41,12 +54,16 @@ def _save_uploads(files: List[UploadFile], dest_dir: Path) -> list[str]:
 @router.post("/grade")
 async def grade(
     category: str = Form(...),
+    asin: str = Form(""),
     reference_images: List[UploadFile] = File(default=[]),
     inspection_images: List[UploadFile] = File(default=[]),
 ):
-    """Visual / hybrid grading. Multipart: category + two image groups.
+    """Visual / hybrid grading. Multipart: category (+ optional asin) + two image groups.
 
-    Uploads are saved to a temp dir that is cleaned up after grading.
+    The REFERENCE (catalog) image is resolved automatically from the catalog table by `asin`
+    when no reference image is uploaded — so the rider/customer only sends inspection photos.
+    An explicitly uploaded reference image overrides the catalog lookup. Uploads are saved to
+    a temp dir that is cleaned up after grading.
     """
     path = get_path(category)
 
@@ -59,6 +76,14 @@ async def grade(
 
         ref_paths = _save_uploads(reference_images, ref_dir)
         insp_paths = _save_uploads(inspection_images, insp_dir)
+
+        # Auto-fetch the catalog reference by ASIN when none was uploaded.
+        reference_source = "uploaded" if ref_paths else "none"
+        if not ref_paths and asin:
+            auto = reference_paths_for(asin)
+            if auto:
+                ref_paths = auto
+                reference_source = "catalog"
 
         if not insp_paths:
             return JSONResponse(
@@ -75,6 +100,7 @@ async def grade(
         #  should use /grade/functional.)
         result = grade_visual(ref_paths, insp_paths, category)
         result["path"] = path
+        result["reference_source"] = reference_source  # uploaded | catalog | none
         return JSONResponse(result)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

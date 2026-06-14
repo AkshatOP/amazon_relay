@@ -1,15 +1,12 @@
 /* p2p.js — Screens 5–7 (P2P resale exchange).
    5 Nudge   : /p2p/purchases + /p2p/nudge      (Stage-1 price)
    6 Grade   : /grade (or functional) + /p2p/list (Stage-2 price + Health Card)
-   7 Handoff : /p2p/demand/generate + /find + /p2p/handoff (real payout)
-
-   NOTE: the Stitch mockup's handoff showed "Green Credits +500" and CO₂, but the
-   backend handoff response has NEITHER (green credits were removed). We show the real
-   seller_payout/platform_fee/total_km instead. // TODO: backend field — co2_saved, green_credits */
+   7 Handoff : /p2p/demand/generate + /find + /p2p/handoff (payout + CO₂ + green credits) */
 (function () {
   "use strict";
   const { fmt, ui } = { fmt: App.fmt, ui: App.ui };
-  let p2pFiles = {};
+  const MAX_PHOTOS = 5;
+  let p2pFiles = [];   // up to MAX_PHOTOS File objects, all sent to /grade
 
   // ---- Screen 5: Nudge --------------------------------------------------
   async function renderNudge() {
@@ -26,8 +23,8 @@
     host.innerHTML = `
       <h2 class="font-headline-md text-headline-md text-primary">P2P Exchange</h2>
       <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-stack-md flex flex-col gap-stack-sm shadow-sm">
-        <div class="h-40 bg-surface-container rounded-md flex items-center justify-center text-on-surface-variant">
-          <span class="material-symbols-outlined text-[56px]">${iconFor(p.category)}</span></div>
+        <div class="relative overflow-hidden h-40 bg-surface-container rounded-md flex items-center justify-center text-on-surface-variant">
+          ${App.ui.productImg(p.asin, iconFor(p.category), "text-[56px]")}</div>
         <h3 class="font-headline-sm text-headline-sm text-on-surface mt-2">${p.item_name}</h3>
         <p class="font-body-md text-body-md text-on-surface-variant">Purchased: ${p.purchase_date} · ${fmt.inr(p.original_price)}</p>
         <div class="flex items-center gap-2 mt-2">
@@ -67,30 +64,98 @@
 
   // ---- Screen 6: Grade + Health Card -----------------------------------
   function renderGradeScreen() {
-    p2pFiles = {};
+    p2pFiles = [];
     const p = App.state.p2p.purchase;
     const host = document.getElementById("screen-p2p-grade");
     if (!p) { host.innerHTML = `<p class="p-4">Start from the Nudge screen.</p>`; return; }
     host.innerHTML = `
       <div class="flex items-center gap-2"><button class="p-1 -ml-1 text-on-surface-variant" onclick="App.router.go('p2p-nudge')"><span class="material-symbols-outlined">arrow_back</span></button>
         <h2 class="font-headline-md text-headline-md text-on-surface">Grade Condition</h2></div>
-      <div class="bg-near-black rounded-xl p-6 flex flex-col items-center justify-center gap-stack-md relative min-h-[180px]">
-        <div class="relative w-40 h-40 flex items-center justify-center">
+
+      <div id="p2p-drop" class="relative bg-near-black rounded-xl overflow-hidden min-h-[240px] flex flex-col items-center justify-center gap-3 cursor-pointer border-2 border-transparent transition-colors">
+        <img id="p2p-preview" alt="" class="absolute inset-0 w-full h-full object-contain bg-near-black hidden"/>
+        <div class="relative w-40 h-40 flex items-center justify-center pointer-events-none">
           <div class="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-amber bracket-anim"></div>
           <div class="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-amber bracket-anim"></div>
           <div class="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-amber bracket-anim"></div>
           <div class="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-amber bracket-anim"></div>
-          <span class="material-symbols-outlined text-[48px] text-white/70">${iconFor(p.category)}</span>
+          <span class="material-symbols-outlined text-[48px] text-white/70 p2p-icon">${iconFor(p.category)}</span>
         </div>
-        <label class="bg-white/10 text-white font-label-md text-label-md px-3 py-1.5 rounded-full cursor-pointer flex items-center gap-1">
-          <span class="material-symbols-outlined text-[16px]">add_a_photo</span> Add photo (optional)
-          <input id="p2p-file" type="file" accept="image/*" class="hidden"/></label>
+        <span id="p2p-hint" class="font-label-md text-label-md text-white/70 z-[5] text-center px-4">Drag &amp; drop up to ${MAX_PHOTOS} photos, tap to choose, or use the live camera</span>
+        <span id="p2p-count" class="hidden absolute top-2 right-2 z-10 bg-amber text-near-black font-label-bold text-label-bold px-2 py-0.5 rounded-full"></span>
+        <input id="p2p-file" type="file" accept="image/*" multiple class="hidden"/>
       </div>
+
+      <div id="p2p-strip" class="hidden grid-cols-5 gap-2"></div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <button id="p2p-add" class="bg-surface border border-outline-variant rounded-lg py-3 flex items-center justify-center gap-2 hover:bg-surface-container-low transition-colors font-label-bold text-label-bold text-on-surface">
+          <span class="material-symbols-outlined text-[18px]">add_photo_alternate</span> Add / drop photos</button>
+        <button id="p2p-cam" class="bg-surface border border-primary text-primary rounded-lg py-3 flex items-center justify-center gap-2 hover:bg-surface-container-low transition-colors font-label-bold text-label-bold">
+          <span class="material-symbols-outlined text-[18px]">photo_camera</span> Live camera</button>
+      </div>
+      <p class="font-label-md text-label-md text-on-surface-variant -mt-1">Add 1–${MAX_PHOTOS} photos (more angles + close-ups of any worn/damaged part grade more accurately). All photos are sent to the AI together. No photo → functional checklist grade (still a real API call).</p>
+
       <button id="btn-p2p-grade" class="w-full bg-primary text-on-primary py-3 rounded-lg font-headline-sm text-headline-sm flex items-center justify-center gap-2">
         <span class="material-symbols-outlined">memory</span> Grade &amp; reveal Stage-2 price</button>
       <div id="p2p-grade-result" class="hidden flex-col gap-stack-lg"></div>`;
-    document.getElementById("p2p-file").addEventListener("change", (e) => { if (e.target.files[0]) { p2pFiles.img = e.target.files[0]; App.toast("Photo added", "ok"); } });
+
+    const drop = document.getElementById("p2p-drop");
+    const fileInput = document.getElementById("p2p-file");
+    drop.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", (e) => { addP2pFiles(e.target.files); fileInput.value = ""; });
+    drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("border-amber"); });
+    drop.addEventListener("dragleave", () => drop.classList.remove("border-amber"));
+    drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("border-amber"); addP2pFiles(e.dataTransfer.files); });
+    document.getElementById("p2p-add").addEventListener("click", () => fileInput.click());
+    document.getElementById("p2p-cam").addEventListener("click", () => App.ui.openCamera((f) => addP2pFiles([f])));
     document.getElementById("btn-p2p-grade").addEventListener("click", doP2pGrade);
+  }
+
+  function addP2pFiles(fileList) {
+    const imgs = [...(fileList || [])].filter((f) => f.type.startsWith("image/"));
+    if (!imgs.length) return;
+    let added = 0;
+    for (const f of imgs) {
+      if (p2pFiles.length >= MAX_PHOTOS) { App.toast(`Max ${MAX_PHOTOS} photos`, "info"); break; }
+      p2pFiles.push(f); added++;
+    }
+    if (added) App.toast(`${added} photo${added > 1 ? "s" : ""} added (${p2pFiles.length}/${MAX_PHOTOS})`, "ok");
+    refreshP2pPhotos();
+  }
+
+  function removeP2pAt(i) { p2pFiles.splice(i, 1); refreshP2pPhotos(); }
+
+  function refreshP2pPhotos() {
+    const n = p2pFiles.length;
+    const preview = document.getElementById("p2p-preview");
+    const icon = document.querySelector("#p2p-drop .p2p-icon");
+    const hint = document.getElementById("p2p-hint");
+    const count = document.getElementById("p2p-count");
+    const strip = document.getElementById("p2p-strip");
+
+    if (n > 0) {
+      preview.src = URL.createObjectURL(p2pFiles[n - 1]); preview.classList.remove("hidden");
+      if (icon) icon.classList.add("hidden");
+      hint.textContent = `${n} photo${n > 1 ? "s" : ""} ready ✓ — tap Grade to analyze`;
+      count.textContent = `${n}/${MAX_PHOTOS}`; count.classList.remove("hidden");
+    } else {
+      preview.src = ""; preview.classList.add("hidden");
+      if (icon) icon.classList.remove("hidden");
+      hint.textContent = `Drag & drop up to ${MAX_PHOTOS} photos, tap to choose, or use the live camera`;
+      count.classList.add("hidden");
+    }
+
+    // thumbnail strip with remove buttons
+    strip.classList.toggle("hidden", n === 0);
+    strip.classList.toggle("grid", n > 0);
+    strip.innerHTML = p2pFiles.map((f, i) => `
+      <div class="relative aspect-square rounded-md overflow-hidden border border-outline-variant">
+        <img src="${URL.createObjectURL(f)}" class="w-full h-full object-cover" alt=""/>
+        <button class="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center" data-i="${i}">
+          <span class="material-symbols-outlined text-[14px]">close</span></button>
+      </div>`).join("");
+    strip.querySelectorAll("button[data-i]").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); removeP2pAt(Number(b.dataset.i)); }));
   }
 
   async function doP2pGrade() {
@@ -99,7 +164,7 @@
     const orig = btn.innerHTML; btn.innerHTML = ui.spinnerBtnHTML("Grading…"); btn.disabled = true;
 
     let g;
-    if (p2pFiles.img) g = await App.api.grade(p.category, { inspection: [p2pFiles.img] });
+    if (p2pFiles.length > 0) g = await App.api.grade(p.category, { inspection: p2pFiles }, p.asin);
     else g = await App.api.gradeFunctional(p.category, [true, true, true]);
 
     if (!g || g.grade === "ERROR" || g._networkError) { btn.innerHTML = orig; btn.disabled = false; App.toast("Grading failed", "err"); return; }
@@ -201,7 +266,7 @@
     });
     if (!h || h.error || h._networkError) { App.toast(h && h.error ? h.error : "handoff failed", "err"); return; }
     App.state.p2p.handoff = h;
-    const fin = h.financials || {}, legs = h.legs || {};
+    const fin = h.financials || {}, legs = h.legs || {}, co2 = h.co2 || {}, gc = h.green_credits || {};
     document.getElementById("handoff-final").innerHTML = `
       <div class="bg-surface-container-low border border-primary-fixed-dim rounded-lg p-4 flex flex-col gap-stack-md animate-enter mt-2">
         <div class="flex items-center gap-2"><span class="material-symbols-outlined text-primary fill-icon">check_circle</span>
@@ -211,8 +276,13 @@
           ${fStat("Platform fee", fmt.inr(fin.platform_fee))}
           ${fStat("Seller payout", fmt.inr(fin.seller_payout))}
         </div>
+        <div class="bg-primary-fixed/40 rounded-lg p-3 flex items-center justify-between">
+          <div class="flex items-center gap-2"><span class="material-symbols-outlined text-primary fill-icon">eco</span>
+            <div><div class="font-headline-sm text-headline-sm text-on-surface">+${(gc.credits_rs||0).toLocaleString("en-IN")} green credits</div>
+              <div class="font-label-md text-label-md text-on-surface-variant">${fmt.kg(co2.saved_kg)} CO₂ saved vs a fresh unit from the ${fmt.km(co2.fc_road_km_used)} FC haul</div></div></div>
+          <span class="font-headline-md text-headline-md font-bold text-primary">${fmt.inr(fin.total_seller_value)}</span>
+        </div>
         <p class="font-label-md text-label-md text-on-surface-variant">${h.logistics_note || ""}</p>
-        <p class="font-label-md text-label-md text-on-surface-variant">/* CO₂ saved + green credits: not in backend handoff response yet — TODO backend field */</p>
       </div>`;
   }
 

@@ -22,6 +22,15 @@ DELIVERY_BIKE = {
     "avg_items_per_trip": 1,
 }
 
+# --- "vs buying new" CO2 comparison (handoff) --------------------------------
+# A same-town P2P handoff avoids shipping a fresh unit from the distant FC. We quantify
+# the CO2 saved and convert it to seller green credits. Physical constants mirror routing.
+DIESEL_CO2_KG_PER_L = 2.68          # kg CO2e per litre diesel
+FC_CONTAINER_TRUCK = {"mileage_kmpl": 6.0, "avg_items_per_trip": 250}
+UDUPI_FC_ROAD_KM = 448.0            # OSRM-verified Udupi -> BLR FC (Shiradi Ghats)
+BLR_FC_ROAD_KM = 25.0              # typical Bengaluru -> buyer (metro comparison)
+GREEN_CREDIT_RATE_PER_KG_CO2 = 50.0 # Rs of green credits per kg CO2 saved (illustrative)
+
 # --- Warranty residual bonus -------------------------------------------------
 # Each remaining transferable warranty year adds a small trust uplift to the price.
 # Increases buyer confidence AND seller payout. Illustrative — not contractual.
