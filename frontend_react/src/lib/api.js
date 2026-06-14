@@ -1,5 +1,20 @@
 // api.js — the single source of backend calls. Shapes verified against the backend domain routers.
-export const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+// Backend base URL, resolved per environment so the same build works locally AND on Vercel:
+//   1. VITE_API_URL (build-time env) wins — set it in Vercel if the backend URL changes.
+//   2. running on localhost/127.0.0.1 → local backend on :8000.
+//   3. anything else (e.g. the Vercel deploy) → the live Railway backend (https, no mixed content).
+function resolveBaseUrl() {
+  const env = import.meta.env && import.meta.env.VITE_API_URL;
+  if (env) return env.replace(/\/$/, "");
+  if (typeof window !== "undefined") {
+    const h = window.location.hostname;
+    if (h === "localhost" || h === "127.0.0.1" || h === "0.0.0.0") return "http://localhost:8000";
+  }
+  return "https://amazonrelay-production.up.railway.app";
+}
+
+export const BASE_URL = resolveBaseUrl();
 
 // toast() is injected by the store so api errors surface in the UI.
 let _toast = () => {};

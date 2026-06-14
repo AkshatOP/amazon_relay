@@ -24,7 +24,9 @@ from backend.p2p.router import router as p2p_router
 
 app = FastAPI(title="Relay HUB API", version="1.0.0")
 
-# CORS wide open for local dev / demo (the React app on :5173 calls this).
+# CORS wide open — allows the local React dev server (:5173) AND the deployed Vercel frontend
+# (https://relay-hub-six.vercel.app) to call this API. No credentials are used, so "*" is valid
+# and also satisfies POST preflight (OPTIONS) for JSON/multipart requests.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

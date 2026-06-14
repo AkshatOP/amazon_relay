@@ -18,7 +18,7 @@ from .seed_locations import REGIONS, get_external_fc, get_nodes, get_region
 ROAD_CIRCUITY = 1.4
 
 _EARTH_RADIUS_KM = 6371.0088
-_OSRM_BASE = "http://router.project-osrm.org/route/v1/driving"
+_OSRM_BASE = "https://router.project-osrm.org/route/v1/driving"
 _OSRM_TIMEOUT = 5.0  # seconds; if OSRM doesn't respond, fall back to haversine
 
 
