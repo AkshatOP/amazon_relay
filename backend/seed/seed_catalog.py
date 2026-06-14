@@ -31,8 +31,8 @@ CATALOG = [
     ("B0WT001",          "Analog Wrist Watch",                   "watch",        "B0WT001.jpg"),
     ("B0FW001",          "Running Shoes Pro",                    "footwear",     "B0FW001.jpg"),
     ("B0SH001",          "Leather Formal Shoes",                 "shoes",        "B0SH001.jpg"),
-    ("B0BG001",          "Tote Handbag",                         "bag",          "B0BG001.jpg"),
-    ("B0TY001",          "Building Blocks Set",                  "toy",          "B0TY001.jpg"),
+    ("B0PB001",          "Power Bank (20000mAh)",                "power_bank",   "B0PB001.jpg"),
+    ("B0PC001",          "Silicone Phone Case",                  "phonecase",    "B0PC001.jpg"),
 ]
 
 

@@ -17,8 +17,8 @@ uvicorn backend.main:app --reload          # → http://localhost:8000   (/docs 
 ```bash
 cd frontend_react && npm install && npm run dev   # → http://localhost:5173, calls :8000
 ```
-The original static UIs still work as a fallback (`frontend_app/` vanilla; `frontend/`,
-`frontend_routing/`, `frontend_p2p/`), each served on its own port and calling `:8000`.
+`frontend/index.html` is a small static page the app serves at `GET /` — the grading demo
+(visual upload + the weighted functional-grading checklist UI).
 
 ## Structure
 

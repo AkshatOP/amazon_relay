@@ -20,9 +20,16 @@ from .category_map import get_path
 from .catalog import reference_paths_for
 from .functional_grader import grade_functional
 from .grading_agent import grade_visual
-from .schemas import FunctionalGradeRequest
+from .schemas import FunctionalGradeRequest, get_checks
 
 router = APIRouter(tags=["grading"])
+
+
+@router.get("/grade/functional/checks")
+def functional_checks(category: str = "accessory"):
+    """Canonical ordered check list (labels) for a functional category. The frontend embeds
+    these directly for instant render; this endpoint lets it confirm alignment."""
+    return {"category": category, "checks": get_checks(category)}
 
 
 @router.get("/catalog/image/{asin}")
@@ -108,7 +115,8 @@ async def grade(
 
 @router.post("/grade/functional")
 async def grade_functional_endpoint(req: FunctionalGradeRequest):
-    """Functional grading from yes/no answers."""
-    result = grade_functional(req.answers, req.category)
+    """Weighted functional grading from yes/no answers (+ optional free-text description)."""
+    result = grade_functional(req.answers, req.category, req.description)
     result["path"] = "functional"
+    result["checks"] = get_checks(req.category)  # canonical list, echoed for traceability
     return JSONResponse(result)

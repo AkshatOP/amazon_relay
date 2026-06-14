@@ -9,6 +9,7 @@ const DRAWER = [
   { key: "rider", icon: "local_shipping", label: "Rider grading" },
   { key: "map", icon: "map", label: "Logistics map" },
   { key: "p2p-nudge", icon: "sync_alt", label: "P2P resale" },
+  { key: "shop", icon: "storefront", label: "Shop (buyer)" },
 ];
 const BOTTOM = [
   { key: "hub", icon: "home", label: "Home" },

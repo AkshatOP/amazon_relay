@@ -41,7 +41,7 @@ uvicorn backend.main:app --reload          # :8000  ·  /docs has every endpoint
 
 # 5. Start the frontend (primary UI: React)
 cd frontend_react && npm install && npm run dev    # → http://localhost:5173
-#    (legacy static UIs still work as a fallback — see frontend_app/ and frontend_{routing,p2p}/)
+#    (the backend also serves a small static grading demo at http://localhost:8000/ )
 ```
 
 ## API (single port)
@@ -74,10 +74,7 @@ amazon-relay/
 │   ├── data/        #   relay.db (generated, gitignored)
 │   └── seed/        #   seed_routing / seed_p2p / seed_catalog / seed_all + README
 ├── frontend_react/      # PRIMARY UI — Vite + React + Tailwind + framer-motion + Leaflet (:5173)
-├── frontend_app/        # fallback — original vanilla-JS single-page UI (superseded)
-├── frontend/            # legacy grading demo UI (served at /)
-├── frontend_routing/    # legacy routing demo UI (static)
-├── frontend_p2p/        # legacy p2p demo UI (static)
+├── frontend/            # small static grading demo served by the app at / (visual + functional checklist)
 ├── skills/          # grading_skill.yaml — the runtime rubric
 ├── docs/            # CONTEXT, ARCHITECTURE, TODO
 └── sample_images/

@@ -232,9 +232,11 @@ grading service over HTTP. That HTTP hop is gone — everything is one process n
 
 ### Frontend (Phase 7)
 The primary UI is **`frontend_react/`** — a Vite + React 18 + Tailwind + framer-motion + Leaflet
-app (one mobile-first shell, 8 screens, animated transitions). It calls `:8000` (CORS open).
-The original vanilla-JS app (`frontend_app/`) and the per-domain static pages are kept as a
-fallback. See `frontend_react/README.md`.
+app (one mobile-first shell, 9 screens incl. the buyer Shop, animated transitions). It calls
+`:8000` (CORS open). A small static `frontend/index.html` is also served by the app at `GET /`
+(the grading demo + the weighted functional-grading checklist UI). The earlier per-domain
+static demos (`frontend_app/`, `frontend_routing/`, `frontend_p2p/`) were removed in cleanup.
+See `frontend_react/README.md`.
 
 ### Catalog auto-reference (grading)
 `POST /grade` takes an optional `asin`; with no uploaded reference image the backend loads the

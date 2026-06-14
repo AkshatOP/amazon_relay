@@ -17,7 +17,8 @@ GRADING_PATH: dict[str, str] = {
     "baby_gear": "visual",
     "toy": "visual",
     "book": "visual",
-    # Functional — a photo is useless; graded by yes/no rules.
+    # Functional — a photo is useless; graded by weighted yes/no checks.
+    "smartphone": "functional",
     "charger": "functional",
     "power_bank": "functional",
     "speaker": "functional",

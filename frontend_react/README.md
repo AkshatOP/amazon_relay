@@ -42,13 +42,14 @@ src/
 │   └── coords.js           # node lat/lng lookup (route gives names, not coords)
 ├── components/
 │   ├── ui.jsx              # Icon, Gauge, GradeBadge, DefectChips, TerminalLog, ProductImg, Spinner
+│   ├── HealthCard.jsx      # shared Product Health Card (same visual the grader + P2P produce)
 │   ├── CameraModal.jsx     # shared getUserMedia capture (device picker)
 │   ├── LocationPicker.jsx  # full-screen map picker — RCC/FC/station markers + legend + region detect
 │   ├── Thinking.jsx        # animated "thinking" checklist + useThinking() pacing hook
 │   └── Shell.jsx           # top bar, animated drawer, bottom nav, toaster
 └── screens/
     ├── Orders.jsx · ReturnFlow.jsx · Rider.jsx · MapScreen.jsx
-    └── P2PNudge.jsx · P2PGrade.jsx · P2PHandoff.jsx · Hub.jsx
+    └── P2PNudge.jsx · P2PGrade.jsx · P2PHandoff.jsx · Hub.jsx · Shop.jsx
 ```
 
 ## Screen → endpoint map
@@ -63,6 +64,7 @@ src/
 | P2P Nudge | `GET /p2p/purchases`, `GET /p2p/nudge/{id}` |
 | P2P Grade | `POST /grade` (1–5 photos) → `POST /p2p/list` |
 | P2P Handoff | `POST /p2p/demand/generate` → `/find` → `POST /p2p/handoff` |
+| **Shop (buyer)** | static store list; Health Card from cached `state.p2p.listing.health_card` if present, else a seeded demo card (`// TODO: GET /p2p/listing/{id}`). Renders via the shared `<HealthCard/>`. |
 
 ## Notes
 - **Photo capture** (Rider 4, P2P 5): drag-drop + file picker + live camera, all sent to `/grade`.

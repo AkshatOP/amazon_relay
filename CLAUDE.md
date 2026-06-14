@@ -41,10 +41,11 @@ uvicorn backend.main:app --reload  # → http://localhost:8000  (/docs covers ev
 ```
 ### Frontend
 **Primary UI: `frontend_react/`** — Vite + React 18 + Tailwind + framer-motion + Leaflet (one
-mobile-first app, all 8 screens, animated). Run: `cd frontend_react && npm install && npm run dev`
+mobile-first app, all 9 screens incl. Shop, animated). Run: `cd frontend_react && npm install && npm run dev`
 (→ :5173). See [`frontend_react/README.md`](frontend_react/README.md).
-**Fallback: `frontend_app/`** — the original vanilla-JS/CDN version (superseded; kept as backup).
-The legacy `frontend/`, `frontend_routing/`, `frontend_p2p/` static pages also still work.
+**`frontend/`** — a small static page the backend serves at `GET /`: the grading demo (visual
+upload + the weighted **functional-grading checklist** UI). It's the only home of the functional
+checklist UI. (The old `frontend_app/`, `frontend_routing/`, `frontend_p2p/` demos were removed.)
 
 > **Build discipline:** do NOT run `npm run build` after each frontend edit — the user runs the
 > build once at the end. Write valid JSX and stop.

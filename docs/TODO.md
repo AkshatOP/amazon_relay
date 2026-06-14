@@ -30,6 +30,26 @@
 - [x] yes/no question UI + /grade/functional
 - [ ] hybrid path combining photos + answers (visual half wired; answers-merge TODO)
 
+### ✅ Functional grading upgrade (DONE)
+Functional grading upgraded — weighted, category-aware, strict resale, optional description merge:
+- [x] `schemas.py` — `FUNCTIONAL_CHECK_DEFINITIONS` registry with per-check weights (3 critical/
+      primary/safety · 2 important · 1 minor); first check is the PRIMARY (always w3) → fail = D.
+      11 categories incl. new **smartphone** (with a weight-3 "screen/body free of cracks" check
+      as #2 so a working-but-cracked phone is blocked). power_bank LED raised 1→2.
+      Backward-compat `FUNCTIONAL_CHECKS`/`DEFAULT_CHECKS` derived; `get_checks`/`get_definitions`
+      helpers; `description` field added to `FunctionalGradeRequest`.
+- [x] `functional_grader.py` — weighted_ratio scoring + strict resale rules (any w2/w3 fail →
+      C not-resale; primary fail or ratio<0.55 → D; only w1 fail → B; all pass → A). Per-check
+      named defects `FAILED (wN): …`, dynamic confidence. Optional description path uses the
+      CENTRAL gemini-2.5-flash client (no hardcoded model) with FULL context (category + checklist
+      + answers + rule grade + description) and MERGES (more conservative grade wins, defects
+      unioned, confidence averaged); never throws → falls back to the rule grade.
+- [x] `category_map.py` — `"smartphone": "functional"` (NOT "phone").
+- [x] `router.py` — `GET /grade/functional/checks?category=`; POST passes `description`, echoes `checks`.
+- [x] `frontend/index.html` — functional section rebuilt in the file's style: 11-category dropdown
+      (smartphone value), embedded checks matching the backend label-for-label, Yes/No toggles,
+      ★ CRITICAL badge, neutral unanswered state, description textarea, Reset, shared `renderSummary`.
+
 ## ✅ Phase 3 — Geo-Routing Agent (DONE, API live)
 - [x] `routing/config.py` — all constants in one place (fuel ₹91/L, vehicle mileage, demand radius)
 - [x] `routing/seed_locations.py` — 8 Bengaluru RCCs + 4 FCs with real coordinates
@@ -181,7 +201,8 @@ Frontend (`frontend_react/` — Vite + React 18 + Tailwind + framer-motion + Lea
 - [x] Context-aware map metrics: savings cards when a local intercept saved money, else a
       "Normal route followed" panel (no misleading ₹0.00).
 - [x] P2P "thinking" pacing (animated checklist + min dwell) before each step's result.
-- [x] Hub reads real `/metrics`. `frontend_app/` (vanilla) kept as a fallback.
+- [x] Hub reads real `/metrics`. (Legacy `frontend_app/`, `frontend_routing/`, `frontend_p2p/`
+      demos removed in cleanup; `frontend/` kept — the static grading + functional-checklist page served at `/`.)
 
 ## Progress: Phases 1, 3, 3b, 5, 6, and 7 complete (~90% of MVP scope).
 Phase 1: visual grading agent (live-tested). Phase 3/3b: geo-routing with logistics-arbitrage

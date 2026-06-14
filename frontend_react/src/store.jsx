@@ -1,14 +1,15 @@
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { setToast } from "./lib/api";
+import { DEMO_ITEMS } from "./lib/demoItems";
 
 const AppCtx = createContext(null);
 export const useApp = () => useContext(AppCtx);
 
-// Default rider/routing scenario = the seeded Udupi niche shoe (only item with a nearby buyer).
+// Default = first demo item (the seeded Udupi niche shoe) at the Udupi City pickup point.
+// Item fields come from demoItems; the pickup location is separate (changed on the map).
 const DEFAULT_ORDER = {
-  product_name: "Trail Runner Shoes (niche brand)", category: "shoes", asin: "B0SH_UDUPI_NICHE",
-  original_price: 400, order_id: "AZ-9921-X", region: "udupi",
-  customer_lat: 13.3409, customer_lng: 74.7421, customer_area: "Udupi City",
+  ...DEMO_ITEMS[0],
+  region: "udupi", customer_lat: 13.3409, customer_lng: 74.7421, customer_area: "Udupi City",
 };
 
 let _id = 0;

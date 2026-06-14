@@ -74,6 +74,117 @@ def make_error_result(reason: str, raw: str = "") -> dict:
     }
 
 
+# --- Functional check registry (weighted, category-aware) -------------------
+# Each check carries a weight: 3 = CRITICAL (core function / safety), 2 = IMPORTANT
+# (significant functional issue), 1 = MINOR (cosmetic / convenience). The FIRST check in
+# every category is the PRIMARY-function check (always weight 3); failing it alone → Grade D.
+FUNCTIONAL_CHECK_DEFINITIONS: dict[str, list[dict]] = {
+    # smartphone: check #2 is a structural-integrity check so a cracked-but-working phone is
+    # correctly blocked (a functional phone with a shattered screen must NOT grade A).
+    "smartphone": [
+        {"label": "Powers on and reaches the home screen", "weight": 3},
+        {"label": "Screen and body free of cracks or structural damage", "weight": 3},
+        {"label": "Touchscreen responds accurately across the full display", "weight": 3},
+        {"label": "Battery charges and holds charge", "weight": 3},
+        {"label": "Speaker, microphone, and cameras all work", "weight": 2},
+        {"label": "All physical buttons and charging port functional", "weight": 2},
+    ],
+    "charger": [
+        {"label": "Charges a connected device", "weight": 3},
+        {"label": "Connectors and pins intact", "weight": 3},
+        {"label": "Output stable under load (does not cut out)", "weight": 2},
+        {"label": "Indicator lights work", "weight": 1},
+        {"label": "Insulation and casing undamaged", "weight": 2},
+    ],
+    "power_bank": [
+        {"label": "Charges from mains", "weight": 3},
+        {"label": "Discharges correctly to a connected device", "weight": 3},
+        {"label": "All output ports functional", "weight": 2},
+        {"label": "LED charge indicators work", "weight": 2},
+        {"label": "No swelling, excess heat, or smell", "weight": 3},
+    ],
+    "speaker": [
+        {"label": "Powers on", "weight": 3},
+        {"label": "Audio is clear and undistorted", "weight": 3},
+        {"label": "Volume controls work", "weight": 2},
+        {"label": "Bluetooth / AUX pairing works", "weight": 2},
+        {"label": "Battery charges", "weight": 2},
+    ],
+    "cable": [
+        {"label": "Connectors intact at both ends", "weight": 3},
+        {"label": "Charging / power delivery works", "weight": 3},
+        {"label": "Data transfer works", "weight": 2},
+        {"label": "No exposed or frayed wire", "weight": 3},
+        {"label": "Not kinked or sharply bent", "weight": 1},
+    ],
+    "mouse": [
+        {"label": "Left and right buttons click reliably", "weight": 3},
+        {"label": "Scroll wheel works", "weight": 2},
+        {"label": "Sensor tracks accurately", "weight": 3},
+        {"label": "USB / Bluetooth connects", "weight": 3},
+        {"label": "Extra buttons work", "weight": 1},
+    ],
+    "keyboard": [
+        {"label": "All keys register correctly", "weight": 3},
+        {"label": "USB / Bluetooth connects", "weight": 3},
+        {"label": "No keys missing or loose", "weight": 2},
+        {"label": "Backlighting works", "weight": 1},
+        {"label": "No liquid damage", "weight": 2},
+    ],
+    "laptop": [
+        {"label": "Powers on to the operating system", "weight": 3},
+        {"label": "Screen displays correctly (no cracks / dead pixels)", "weight": 3},
+        {"label": "Battery charges and holds charge", "weight": 3},
+        {"label": "Keyboard, trackpad, and ports work", "weight": 3},
+        {"label": "Wi-Fi connects", "weight": 2},
+    ],
+    "headphones": [
+        {"label": "Audio is clear in both ears", "weight": 3},
+        {"label": "Controls respond", "weight": 2},
+        {"label": "Bluetooth / cable connection works", "weight": 3},
+        {"label": "Microphone works", "weight": 1},
+        {"label": "Battery charges", "weight": 2},
+    ],
+    "camera": [
+        {"label": "Powers on", "weight": 3},
+        {"label": "Shutter and autofocus work", "weight": 3},
+        {"label": "LCD / viewfinder works", "weight": 2},
+        {"label": "Battery charges", "weight": 3},
+        {"label": "Image / video quality is acceptable", "weight": 3},
+    ],
+    "appliance": [
+        {"label": "Powers on", "weight": 3},
+        {"label": "Primary function works", "weight": 3},
+        {"label": "All controls respond", "weight": 2},
+        {"label": "No unusual noise, smell, or sparking", "weight": 3},
+        {"label": "Safety features intact", "weight": 3},
+    ],
+}
+
+# Generic fallback for an unknown functional category.
+DEFAULT_CHECK_DEFINITIONS: list[dict] = [
+    {"label": "Powers on / performs its primary function", "weight": 3},
+    {"label": "No visible physical or structural damage", "weight": 2},
+    {"label": "All controls, ports, and connectors work", "weight": 2},
+]
+
+# Backward-compat shims (label-only), derived from the definitions.
+FUNCTIONAL_CHECKS: dict[str, list[str]] = {
+    cat: [d["label"] for d in defs] for cat, defs in FUNCTIONAL_CHECK_DEFINITIONS.items()
+}
+DEFAULT_CHECKS: list[str] = [d["label"] for d in DEFAULT_CHECK_DEFINITIONS]
+
+
+def get_definitions(category: str) -> list[dict]:
+    """Full [{label, weight}] list for a category (DEFAULT_CHECK_DEFINITIONS if unknown)."""
+    return FUNCTIONAL_CHECK_DEFINITIONS.get((category or "").strip().lower(), DEFAULT_CHECK_DEFINITIONS)
+
+
+def get_checks(category: str) -> list[str]:
+    """Label-only list for a category (backward-compat; used by the router/UI)."""
+    return [d["label"] for d in get_definitions(category)]
+
+
 # --- API request/response models --------------------------------------------
 
 class FunctionalGradeRequest(BaseModel):
@@ -82,6 +193,9 @@ class FunctionalGradeRequest(BaseModel):
     category: str = "accessory"
     answers: List[bool] = Field(
         ..., description="Ordered yes/no inspection answers (true = yes / passes)."
+    )
+    description: str = Field(
+        default="", description="Optional free-text description of the item's condition."
     )
 
 

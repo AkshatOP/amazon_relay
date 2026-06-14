@@ -30,10 +30,9 @@ PROJECT_ROOT = BACKEND_DIR.parent
 DATA_DIR = BACKEND_DIR / "data"
 DB_PATH = DATA_DIR / "relay.db"
 
-# Static demo-UI directories (served / referenced by the single app).
+# Legacy grading demo UI served by the app at GET / (the primary UI is the React app
+# in frontend_react/, run separately with Vite).
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
-FRONTEND_ROUTING_DIR = PROJECT_ROOT / "frontend_routing"
-FRONTEND_P2P_DIR = PROJECT_ROOT / "frontend_p2p"
 
 # Grading skill / rubric (loaded by the grading agent as a system instruction).
 SKILL_PATH = PROJECT_ROOT / "skills" / "grading_skill.yaml"

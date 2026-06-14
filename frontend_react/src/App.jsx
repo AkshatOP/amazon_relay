@@ -9,10 +9,11 @@ import P2PNudge from "./screens/P2PNudge";
 import P2PGrade from "./screens/P2PGrade";
 import P2PHandoff from "./screens/P2PHandoff";
 import Hub from "./screens/Hub";
+import Shop from "./screens/Shop";
 
 const SCREENS = {
   hub: Hub, orders: Orders, return: ReturnFlow, rider: Rider, map: MapScreen,
-  "p2p-nudge": P2PNudge, "p2p-grade": P2PGrade, "p2p-handoff": P2PHandoff,
+  "p2p-nudge": P2PNudge, "p2p-grade": P2PGrade, "p2p-handoff": P2PHandoff, shop: Shop,
 };
 
 export default function App() {

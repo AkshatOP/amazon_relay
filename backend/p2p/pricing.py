@@ -45,7 +45,7 @@ AGE_VALUE_FLOOR: dict[str, float] = {
     "shoes":        0.35,   # fashion cycle; condition matters more than age
     "footwear":     0.35,
     "clothing":     0.20,   # steep drop; fashion/season sensitivity
-    "phone_case":   0.30,   # value tied to compatible phone model
+    "phone_case":   0.20,   # value tied to compatible phone model
     "bag":          0.55,
     "watch":        0.70,   # durable; mechanical holds value especially well
     "baby_gear":    0.50,   # functional items; safety recall risk caps value
@@ -68,7 +68,7 @@ AGE_VALUE_FLOOR: dict[str, float] = {
 
     # --- Extra categories ---
     "baby_monitor": 0.60,   # safety category; still works well at end of life
-    "smartphone":   0.30,   # fast tech cycle; steep drop at end of support window
+    "smartphone":   0.20,   # fast tech cycle; steep drop at end of support window
     "backpack":     0.55,
 }
 _DEFAULT_FLOOR = 0.45

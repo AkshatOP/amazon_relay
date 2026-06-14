@@ -15,8 +15,8 @@ image for that product (resolved by `backend/grading/catalog.py`, seeded by
 | `B0WT001.jpg` | Analog Wrist Watch | watch |
 | `B0FW001.jpg` | Running Shoes Pro | footwear |
 | `B0SH001.jpg` | Leather Formal Shoes | shoes |
-| `B0BG001.jpg` | Tote Handbag | bag |
-| `B0TY001.jpg` | Building Blocks Set | toy |
+| `B0PB001.jpg` | Power Bank (20000mAh) | power_bank |
+| `B0PC001.jpg` | Silicone Phone Case | phonecase |
 
 Notes:
 - `.jpg`, `.png` etc. all work — but the seeded rows expect `.jpg`. To use a different
