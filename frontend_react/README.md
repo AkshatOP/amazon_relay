@@ -17,8 +17,9 @@ npm install
 npm run dev                                 # → http://localhost:5173
 ```
 
-Backend URL is `http://localhost:8000` by default; override with a `.env`:
-`VITE_API_URL=http://localhost:8000`.
+Backend URL is resolved per-environment in `lib/api.js` (`resolveBaseUrl`): `VITE_API_URL` wins,
+else `localhost`/`127.0.0.1` → `http://localhost:8000`, else the deployed Railway backend (https,
+so no mixed-content on Vercel). Override locally with a `.env`: `VITE_API_URL=http://localhost:8000`.
 
 ## Stack
 - **Vite + React 18** — fast HMR, component model.
@@ -60,14 +61,23 @@ src/
 | Orders | static order; **"Change on map"** → LocationPicker → sets pickup lat/lng + region |
 | Return | static (category branch) |
 | **Rider** (hero) | `POST /grade` (multi-photo + `asin`) → `POST /route`; if A/B + no buyer → **hold-at-RCC** with "Skip 2 days" (FC) or "Customer" → `POST /route/intercept` |
-| Map | uses route result; animated draw with OSRM road geometry (pickup→RCC→FC, or pickup→RCC→buyer for an intercept) |
-| P2P Nudge | `GET /p2p/purchases`, `GET /p2p/nudge/{id}` |
-| P2P Grade | `POST /grade` (1–5 photos) → `POST /p2p/list` |
+| Map | uses route result; animated draw with OSRM road geometry (pickup→RCC→FC, or pickup→RCC→buyer for an intercept); savings tiles incl. a **Time saved** estimate in days |
+| P2P Nudge | `GET /p2p/purchases`, `GET /p2p/nudge/{id}`; **"List as-is"** skips grading → `POST /p2p/list` (Grade C = the Stage-1 estimate) → Handoff |
+| P2P Grade | `POST /grade` (Front / Back / Defected-part slots — front+back required, up to 5 photos) → `POST /p2p/list` |
 | P2P Handoff | `POST /p2p/demand/generate` → `/find` → `POST /p2p/handoff` |
-| **Shop (buyer)** | static store list; Health Card from cached `state.p2p.listing.health_card` if present, else a seeded demo card (`// TODO: GET /p2p/listing/{id}`). Renders via the shared `<HealthCard/>`. |
+| **Shop (buyer)** | static store list; the second-life card's photo/icon track the actual listed unit (`p2p.purchase.asin`), tagged **Previously Owned**. Health Card from cached `state.p2p.listing.health_card` if present, else a seeded demo card. Renders via the shared `<HealthCard/>`. |
 
 ## Notes
-- **Photo capture** (Rider 4, P2P 5): drag-drop + file picker + live camera, all sent to `/grade`.
+- **Photo capture**: Rider — drag-drop + file picker + live camera (up to 4). P2P Grade — three
+  labelled slots (**Front** + **Back** mandatory, **Defected part** optional) plus an "Upload photos"
+  multi-picker and live camera, **max 5** total; all filled slots sent to `/grade` together.
+- **Skip grading**: from the P2P Nudge result, "List as-is at this price" lists at the Stage-1
+  (Grade C) estimate and jumps straight to the demand/handoff flow — no photos required.
+- **Time saved (Map)**: alongside CO₂ + FC-haul-avoided, a days-saved estimate — standard
+  return→replacement (FC round-trip + reship + ~5d handling) vs local-resale handoff (~2d), transit
+  at 60 km/h (~540 km/day). Breakdown in the "How we calculated this" panel.
+- Top-bar **search icon removed** (every screen); the Rider routing banner shows an
+  "Item return data logged to Amazon DB" capsule instead of the raw decision source.
 - **Catalog reference**: auto-loaded server-side by `asin`; the UI also shows it on product cards
   via `GET /catalog/image/{asin}` (`<ProductImg>` falls back to an icon on 404).
 - **Location picker**: marks the whole network (Udupi stations teal, BLR RCCs blue, FCs red) with

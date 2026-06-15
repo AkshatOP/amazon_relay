@@ -133,6 +133,10 @@ Phase 1 (visual agent), Phase 3/3b (geo-routing, two regions), Phase 5 (P2P), Ph
 auto-reference, and handoff CO₂/green-credits; UX adds the map location picker (region
 auto-detect, RCC/FC markers + legend), the hold-at-RCC + dynamic intercept flow, an animated
 route-draw map (focus → draw pickup→RCC → fly out → draw RCC→FC), "thinking" pacing in P2P, and
-context-aware metrics (savings cards vs "normal route followed").
+context-aware metrics (savings cards vs "normal route followed", incl. a **Time saved** days
+estimate). Later UX passes added: P2P Grade photo slots (Front/Back mandatory + Defected-part,
+max 5), a P2P Nudge **"List as-is"** path that skips grading (lists at the Stage-1/Grade-C
+estimate, straight to handoff), Shop's second-life card photo tracking the listed unit's ASIN,
+and small chrome cleanups (no top-bar search; "logged to Amazon DB" routing capsule).
 
 Next: Phase 2 hybrid answer-merge. See `docs/TODO.md`.

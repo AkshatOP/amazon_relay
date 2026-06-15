@@ -201,6 +201,15 @@ Frontend (`frontend_react/` — Vite + React 18 + Tailwind + framer-motion + Lea
 - [x] Context-aware map metrics: savings cards when a local intercept saved money, else a
       "Normal route followed" panel (no misleading ₹0.00).
 - [x] P2P "thinking" pacing (animated checklist + min dwell) before each step's result.
+- [x] P2P Grade photo UX: three labelled slots (Front/Back mandatory, Defected-part optional) +
+      "Upload photos" multi-picker + live camera, capped at 5 photos.
+- [x] P2P Nudge "List as-is" — skip grading, list at the Stage-1 (Grade C) estimate, jump straight
+      to the demand/handoff flow.
+- [x] Map "Time saved" tile (days): standard return→replacement (FC round-trip + reship + ~5d FC
+      handling) vs local-resale handoff (~2d), transit at 60 km/h (~540 km/day); shown with a breakdown.
+- [x] UX polish: Shop second-life card photo tracks the listed unit's ASIN ("Previously Owned" tag);
+      removed the top-bar search icon on every screen; Rider banner shows an "Item return data logged
+      to Amazon DB" capsule.
 - [x] Hub reads real `/metrics`. (Legacy `frontend_app/`, `frontend_routing/`, `frontend_p2p/`
       demos removed in cleanup; `frontend/` kept — the static grading + functional-checklist page served at `/`.)
 

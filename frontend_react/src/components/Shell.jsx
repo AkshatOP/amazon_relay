@@ -39,7 +39,6 @@ export default function Shell({ children }) {
               </motion.div>
             )}
           </AnimatePresence>
-          <button className="w-10 h-10 flex items-center justify-center text-primary rounded-full hover:bg-surface-container-high transition-colors"><Icon name="search" /></button>
         </div>
       </header>
 

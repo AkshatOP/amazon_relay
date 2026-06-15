@@ -86,7 +86,7 @@ function HandoffResult({ h }) {
       </div>
       <div className="bg-primary-fixed/40 rounded-lg p-3 flex items-center justify-between">
         <div className="flex items-center gap-2"><Icon name="eco" className="text-primary" fill />
-          <div><div className="font-headline-sm text-headline-sm text-on-surface">+{(gc.credits_rs || 0).toLocaleString("en-IN")} green credits</div>
+          <div><div className="font-headline-sm text-headline-sm text-on-surface">+{(gc.credits_rs || 0).toLocaleString("en-IN")} credits earned</div>
             <div className="font-label-md text-label-md text-on-surface-variant">{fmt.kg(co2.saved_kg)} CO₂ saved vs a fresh unit from the {fmt.km(co2.fc_road_km_used)} FC haul</div></div></div>
         <span className="font-headline-md text-headline-md font-bold text-primary">{fmt.inr(fin.total_seller_value)}</span>
       </div>

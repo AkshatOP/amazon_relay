@@ -12,6 +12,7 @@ export default function P2PNudge() {
   const { p2p, setP2p, go, toast } = useApp();
   const [loading, setLoading] = useState(true);
   const [sy, setSy] = useState(p2p.simulateYears);
+  const [listingBusy, setListingBusy] = useState(false);
   const { steps, thinking, run } = useThinking();
   const purchase = p2p.purchase;
 
@@ -37,6 +38,18 @@ export default function P2PNudge() {
     );
     if (!n || n._networkError || n.error) { toast(n?.error || "nudge failed", "err"); return; }
     setP2p({ nudge: n });
+  }
+
+  // Skip grading: list the item as-is at the Stage-1 (Grade C) estimate, then go straight to
+  // the demand/handoff flow. Grade C → asking price == the Stage-1 estimate already shown.
+  async function listAsIs() {
+    if (!purchase) return;
+    setListingBusy(true);
+    const out = await api.list(purchase.id, "C", 5.0, [], sy);
+    setListingBusy(false);
+    if (!out || out.error || out._networkError) { toast(out?.error || "listing failed", "err"); return; }
+    setP2p({ listing: out, simulateYears: sy });
+    go("p2p-handoff");
   }
 
   if (loading) return <div className="flex items-center justify-center p-8 text-on-surface-variant gap-2"><Icon name="autorenew" className="animate-spin" /> loading purchases…</div>;
@@ -79,6 +92,10 @@ export default function P2PNudge() {
           <button className="w-full bg-transparent border border-primary text-primary font-label-bold text-label-bold py-3 rounded-lg flex justify-center items-center gap-2" onClick={() => go("p2p-grade")}>
             Scan to grade for a higher price <Icon name="arrow_forward" className="text-[18px]" />
           </button>
+          <button disabled={listingBusy} className="w-full bg-amber-action text-near-black font-label-bold text-label-bold py-3 rounded-lg flex justify-center items-center gap-2 disabled:opacity-70" onClick={listAsIs}>
+            {listingBusy ? <Spinner label="Listing…" /> : <>List as-is at this price &amp; find a buyer <Icon name="sell" className="text-[18px]" /></>}
+          </button>
+          <p className="font-label-md text-label-md text-on-surface-variant text-center -mt-1">Skips grading — lists at the Stage-1 (Grade&nbsp;C) estimate.</p>
         </motion.div>
       )}
     </section>

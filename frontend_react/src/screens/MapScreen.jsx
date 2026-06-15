@@ -18,6 +18,32 @@ async function fetchGeom(a, b) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Reverse-logistics TIME model — grounded in India returns benchmarks:
+//   • Receiving + identifying a returned unit at the FC: ~2 days (industry 1–3).
+//   • Inspection / QC before it can be restocked: ~2 days (industry 1–5).
+//   • Restock + dispatch the replacement unit: ~1 day.  → ~5 days fixed FC handling.
+//   • Local resale (Grade A/B) is relisted & handed off within the 48-hour benchmark: ~2 days.
+// Transit = distance ÷ (avg speed × effective haul hours/day). Indian line-haul averages
+// ~60 km/h but runs ~9 effective hours/day after loading/rest/traffic → ~540 km/day.
+const AVG_SPEED_KMPH = 60;
+const HAUL_HOURS_PER_DAY = 9;                              // effective freight driving window/day
+const KM_PER_DAY = AVG_SPEED_KMPH * HAUL_HOURS_PER_DAY;    // ≈ 540 km/day
+const FC_HANDLING_DAYS = 5;                                // receive (2) + inspect (2) + restock/dispatch (1)
+const LOCAL_HANDLING_DAYS = 2;                             // grade + relist/handoff within the 48h benchmark
+
+// Days for the standard return→replacement path vs the local-resale handoff, and the delta.
+function timeModel(geo = {}, match = {}) {
+  const rcc = geo.rcc_distance_km || 0;                    // pickup → RCC
+  const fc = geo.fc_distance_km || 0;                      // RCC → FC haul
+  const buyer = match.buyer_distance_km ?? 10;             // local delivery leg (~10 km if unmatched)
+  // Standard: return hauled up to the FC, a fresh unit reshipped back down to the buyer.
+  const fcDays = (rcc + 2 * fc + buyer) / KM_PER_DAY + FC_HANDLING_DAYS;
+  // Local resale: held at the RCC, handed to a nearby buyer — no FC round-trip.
+  const localDays = (rcc + buyer) / KM_PER_DAY + LOCAL_HANDLING_DAYS;
+  return { fcDays, localDays, saved: Math.max(0, fcDays - localDays) };
+}
+const days = (n) => `${n.toFixed(1)} days`;
+
 /* Animate a Leaflet polyline "drawing" itself via stroke-dashoffset, then clear the dash so
    the line survives re-projection when the map zooms. */
 function animateDraw(line, duration = 1200, delay = 0) {
@@ -131,6 +157,7 @@ export default function MapScreen() {
   const isHold = route.decision === "RESELL_LOCAL";
   const interceptLocal = route.match?.buyer_lat != null && isHold;
   const saved = isHold && (econ.savings_inr || 0) > 0;
+  const tm = timeModel(geo, route.match);
   const DECISION_WORD = { REFURBISH: "refurbishment at the FC", DONATE: "donation", LIQUIDATE: "liquidation", SHIP_TO_FC: "storage / restock at the FC" };
   return (
     <div className="h-full flex flex-col">
@@ -144,7 +171,7 @@ export default function MapScreen() {
         {saved ? (
           <>
             <div className="flex justify-between gap-2">
-              <Stat icon="payments" label="Saved" val={fmt.inr2(econ.savings_inr)} />
+              <Stat icon="schedule" label="Time saved" val={days(tm.saved)} />
               <Stat icon="eco" label="CO₂ saved" val={fmt.kg(econ.co2_saved_kg)} />
               <Stat icon="route" label="FC haul avoided" val={fmt.km(geo.fc_distance_km)} />
             </div>
@@ -159,6 +186,11 @@ export default function MapScreen() {
                   <div className="w-full h-px bg-outline-variant/50 my-1" />
                   <Line k="Net savings:" v={fmt.inr2(econ.savings_inr)} bold />
                   <Line k="CO₂ full / local:" v={`${fmt.kg(econ.co2_full_kg)} / ${econ.co2_local_kg != null ? fmt.kg(econ.co2_local_kg) : "—"}`} />
+                  <div className="w-full h-px bg-outline-variant/50 my-1" />
+                  <Line k="Std return → replacement:" v={days(tm.fcDays)} />
+                  <Line k="Local resale handoff:" v={days(tm.localDays)} />
+                  <Line k="Time saved:" v={days(tm.saved)} bold />
+                  <span className="text-[10px] opacity-70 mt-0.5">transit @ {AVG_SPEED_KMPH} km/h (~{KM_PER_DAY} km/day) + FC handling {FC_HANDLING_DAYS}d vs local {LOCAL_HANDLING_DAYS}d</span>
                 </div>
               )}
             </div>

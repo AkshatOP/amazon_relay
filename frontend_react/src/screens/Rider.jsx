@@ -250,7 +250,7 @@ function RouteBanner({ r }) {
       <section className={`rounded-xl p-5 shadow-sm border flex flex-col gap-3 ${isHold ? "bg-primary-container text-on-primary-container border-primary/20" : "bg-surface-container-high text-on-surface border-outline-variant"}`}>
         <div className="flex items-center justify-between">
           <h3 className="font-headline-sm text-headline-sm font-semibold flex items-center gap-2"><Icon name={isHold ? "route" : "local_shipping"} /> {dest}</h3>
-          <span className={`font-mono-code text-mono-code px-2 py-0.5 rounded ${isHold ? "bg-surface/20" : "bg-surface border border-outline-variant"}`}>{r.decided_by}</span>
+          <span className={`font-label-md text-label-md px-3 py-1 rounded-full flex items-center gap-1 ${isHold ? "bg-surface/20" : "bg-surface border border-outline-variant"}`}><Icon name="cloud_done" className="text-[14px]" />logged to Amazon DB</span>
         </div>
         <div className={`self-start px-3 py-1.5 rounded font-label-bold text-label-bold border flex items-center gap-2 ${isHold ? "bg-surface/20 border-on-primary-container/20" : "bg-surface border-outline-variant"}`}>
           <span className="w-1.5 h-1.5 rounded-full bg-amber-action" /> {TAG[r.decision] || r.decision}

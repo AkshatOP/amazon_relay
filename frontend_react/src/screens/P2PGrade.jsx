@@ -5,32 +5,64 @@ import { api, fmt } from "../lib/api";
 import { Icon, Spinner } from "../components/ui";
 import { Thinking, useThinking } from "../components/Thinking";
 import CameraModal from "../components/CameraModal";
-import { iconFor } from "./P2PNudge";
 
-const MAX = 5;
 const WORD = { A: "Excellent", B: "Good", C: "Fair", D: "Poor" };
+const MAX = 5;  // maximum photos sent to the AI (3 named slots + up to 2 extra)
+// Photo slots — front & back are mandatory; a defected-part close-up is optional but improves grading.
+const SLOT_DEFS = [
+  { key: "front", label: "Front", required: true },
+  { key: "back", label: "Back", required: true },
+  { key: "defected_part", label: "Defected part", required: false },
+];
 
 export default function P2PGrade() {
   const { p2p, setP2p, go, toast } = useApp();
   const purchase = p2p.purchase;
-  const [photos, setPhotos] = useState([]);
+  const [slots, setSlots] = useState({ front: null, back: null, defected_part: null });
+  const [extras, setExtras] = useState([]);  // photos beyond the 3 named slots (up to MAX total)
   const [cam, setCam] = useState(false);
   const [result, setResult] = useState(null); // {g, listing}
   const { steps, thinking, run } = useThinking();
-  const fileRef = useRef(null);
+  const fileRef = useRef(null);       // single-file picker for tapping a named slot
+  const uploadRef = useRef(null);     // multi-file picker for the "Upload photos" button
+  const targetSlot = useRef("front"); // which slot the slot-tap picker fills
 
   if (!purchase) return <p className="p-4">Start from the Nudge screen.</p>;
 
-  function addFiles(list) {
-    const imgs = [...(list || [])].filter((f) => f.type.startsWith("image/"));
-    if (!imgs.length) return;
-    setPhotos((p) => {
-      const next = [...p];
-      for (const f of imgs) { if (next.length >= MAX) { toast(`Max ${MAX} photos`, "info"); break; } next.push(f); }
-      return next;
-    });
+  // Front & back are mandatory; all filled slots + extras (max MAX total) go to the AI together.
+  const photos = [slots.front, slots.back, slots.defected_part, ...extras].filter(Boolean);
+  const count = photos.length;
+  const ready = Boolean(slots.front && slots.back);
+
+  const pick = (key) => { targetSlot.current = key; fileRef.current?.click(); };
+  const setSlot = (key, file) => setSlots((s) => ({ ...s, [key]: file }));
+  const clearSlot = (key) => setSlots((s) => ({ ...s, [key]: null }));
+  const clearExtra = (i) => setExtras((x) => x.filter((_, idx) => idx !== i));
+
+  function onPicked(list) {  // slot tap → replace just that one slot
+    const f = [...(list || [])].find((x) => x.type.startsWith("image/"));
+    if (f) setSlot(targetSlot.current, f);
   }
-  const removeAt = (i) => setPhotos((p) => p.filter((_, idx) => idx !== i));
+
+  // "Upload photos" / camera: route each image to the first empty named slot, then to extras,
+  // capping the total at MAX. Computed from current state so multi-select batches correctly.
+  function addPhotos(list) {
+    const imgs = [...(list || [])].filter((x) => x.type.startsWith("image/"));
+    if (!imgs.length) return;
+    const nextSlots = { ...slots };
+    const nextExtras = [...extras];
+    let total = count;
+    let overflow = false;
+    for (const f of imgs) {
+      const emptyKey = SLOT_DEFS.find((s) => !nextSlots[s.key])?.key;
+      if (emptyKey) { nextSlots[emptyKey] = f; total += 1; continue; }
+      if (total >= MAX) { overflow = true; break; }
+      nextExtras.push(f); total += 1;
+    }
+    setSlots(nextSlots);
+    setExtras(nextExtras);
+    if (overflow) toast(`Maximum ${MAX} photos`, "info");
+  }
 
   async function doGrade() {
     setResult(null);
@@ -54,43 +86,64 @@ export default function P2PGrade() {
 
   return (
     <section className="p-container-margin pb-stack-xl flex flex-col gap-stack-lg">
-      {cam && <CameraModal onCapture={(f) => addFiles([f])} onClose={() => setCam(false)} />}
+      {cam && <CameraModal onCapture={(f) => addPhotos([f])} onClose={() => setCam(false)} />}
 
       <div className="flex items-center gap-2"><button className="p-1 -ml-1 text-on-surface-variant" onClick={() => go("p2p-nudge")}><Icon name="arrow_back" /></button>
         <h2 className="font-headline-md text-headline-md text-on-surface">Grade Condition</h2></div>
 
-      <div onClick={() => fileRef.current?.click()} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); addFiles(e.dataTransfer.files); }}
-        className="relative bg-near-black rounded-xl overflow-hidden min-h-[240px] flex flex-col items-center justify-center gap-3 cursor-pointer border-2 border-transparent">
-        {photos.length > 0 && <img src={URL.createObjectURL(photos[photos.length - 1])} alt="" className="absolute inset-0 w-full h-full object-contain bg-near-black" />}
-        <div className="relative w-40 h-40 flex items-center justify-center pointer-events-none">
-          {["top-0 left-0 border-t-4 border-l-4", "top-0 right-0 border-t-4 border-r-4", "bottom-0 left-0 border-b-4 border-l-4", "bottom-0 right-0 border-b-4 border-r-4"].map((c, i) => <div key={i} className={`absolute w-8 h-8 border-amber bracket-anim ${c}`} />)}
-          {photos.length === 0 && <Icon name={iconFor(purchase.category)} className="text-[48px] text-white/70" />}
-        </div>
-        <span className="font-label-md text-label-md text-white/70 z-[5] text-center px-4">
-          {photos.length > 0 ? `${photos.length} photo${photos.length > 1 ? "s" : ""} ready ✓ — tap Grade to analyze` : `Drag & drop up to ${MAX} photos, tap to choose, or use the live camera`}
-        </span>
-        {photos.length > 0 && <span className="absolute top-2 right-2 z-10 bg-amber text-near-black font-label-bold text-label-bold px-2 py-0.5 rounded-full">{photos.length}/{MAX}</span>}
+      {/* Three photo slots — Front & Back mandatory, Defected part optional. All filled slots
+          are sent to the AI together. Tap a slot to choose a file, or use the live camera. */}
+      <div className="grid grid-cols-3 gap-3">
+        {SLOT_DEFS.map(({ key, label, required }) => {
+          const file = slots[key];
+          return (
+            <div key={key} className="flex flex-col gap-1.5">
+              <button type="button" onClick={() => pick(key)}
+                className={`relative aspect-square rounded-xl overflow-hidden flex flex-col items-center justify-center gap-1 border-2 transition-colors ${file ? "border-primary bg-surface-container-low" : "border-dashed border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low"}`}>
+                {file ? (
+                  <>
+                    <img src={URL.createObjectURL(file)} alt={label} className="absolute inset-0 w-full h-full object-cover" />
+                    <button type="button" onClick={(e) => { e.stopPropagation(); clearSlot(key); }}
+                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center z-10"><Icon name="close" className="text-[15px]" /></button>
+                  </>
+                ) : (
+                  <>
+                    <Icon name="add_a_photo" className="text-[26px] text-on-surface-variant" />
+                    <span className="font-label-md text-label-md text-on-surface-variant text-center leading-tight px-1">{label}</span>
+                  </>
+                )}
+              </button>
+              <span className="font-label-md text-label-md flex items-center justify-center gap-1">
+                <Icon name={file ? "check_circle" : required ? "error" : "add_circle"} fill className={`text-[13px] ${file ? "text-success" : required ? "text-amber" : "text-on-surface-variant"}`} />
+                <span className={file ? "text-on-surface" : "text-on-surface-variant"}>{label}{required ? " *" : ""}</span>
+              </span>
+            </div>
+          );
+        })}
       </div>
-      <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} />
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { onPicked(e.target.files); e.target.value = ""; }} />
+      <input ref={uploadRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
 
-      {photos.length > 0 && (
-        <div className="grid grid-cols-5 gap-2">
-          {photos.map((f, i) => (
+      {/* Extra photos beyond the 3 named slots (up to MAX total). */}
+      {extras.length > 0 && (
+        <div className="grid grid-cols-5 gap-2 -mt-1">
+          {extras.map((f, i) => (
             <div key={i} className="relative aspect-square rounded-md overflow-hidden border border-outline-variant">
               <img src={URL.createObjectURL(f)} alt="" className="w-full h-full object-cover" />
-              <button className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center" onClick={(e) => { e.stopPropagation(); removeAt(i); }}><Icon name="close" className="text-[14px]" /></button>
+              <button type="button" className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center" onClick={() => clearExtra(i)}><Icon name="close" className="text-[13px]" /></button>
             </div>
           ))}
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
-        <button className="bg-surface border border-outline-variant rounded-lg py-3 flex items-center justify-center gap-2 hover:bg-surface-container-low font-label-bold text-label-bold text-on-surface" onClick={() => fileRef.current?.click()}><Icon name="add_photo_alternate" className="text-[18px]" /> Add / drop photos</button>
-        <button className="bg-surface border border-primary text-primary rounded-lg py-3 flex items-center justify-center gap-2 hover:bg-surface-container-low font-label-bold text-label-bold" onClick={() => setCam(true)}><Icon name="photo_camera" className="text-[18px]" /> Live camera</button>
-      </div>
-      <p className="font-label-md text-label-md text-on-surface-variant -mt-1">Add 1–{MAX} photos (more angles + close-ups of any worn/damaged part grade more accurately). All photos go to the AI together. No photo → functional checklist grade.</p>
+      <button className="bg-surface border border-outline-variant text-on-surface rounded-lg py-3 flex items-center justify-center gap-2 hover:bg-surface-container-low font-label-bold text-label-bold disabled:opacity-50" disabled={count >= MAX} onClick={() => uploadRef.current?.click()}><Icon name="upload" className="text-[18px]" /> Upload photos</button>
+      <button className="bg-surface border border-primary text-primary rounded-lg py-3 flex items-center justify-center gap-2 hover:bg-surface-container-low font-label-bold text-label-bold disabled:opacity-50 -mt-2" disabled={count >= MAX} onClick={() => setCam(true)}><Icon name="photo_camera" className="text-[18px]" /> Live camera</button>
 
-      <motion.button whileTap={{ scale: 0.98 }} disabled={thinking} className="w-full bg-primary text-on-primary py-3 rounded-lg font-headline-sm text-headline-sm flex items-center justify-center gap-2 disabled:opacity-70" onClick={doGrade}>
+      <p className="font-label-md text-label-md text-on-surface-variant -mt-1">
+        <span className="font-label-bold text-on-surface">Front and back photos are mandatory</span> (minimum 3 photos, maximum {MAX} — add a close-up of any worn/defected part for a more accurate grade). All photos go to the AI together. <span className="text-on-surface">{count}/{MAX} added.</span>
+      </p>
+
+      <motion.button whileTap={{ scale: 0.98 }} disabled={thinking || !ready} className="w-full bg-primary text-on-primary py-3 rounded-lg font-headline-sm text-headline-sm flex items-center justify-center gap-2 disabled:opacity-50" onClick={doGrade}>
         {thinking ? <Spinner label="Grading…" /> : <><Icon name="memory" /> Grade &amp; reveal Stage-2 price</>}
       </motion.button>
 

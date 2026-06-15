@@ -79,7 +79,7 @@ export default function Shop() {
               )}
             </div>
             <div className="flex flex-wrap gap-1.5 mt-1">
-              <TrustTag label="Second Hand" onClick={() => setOpen((o) => !o)} />
+              <TrustTag label="Previously Owned" onClick={() => setOpen((o) => !o)} />
             </div>
             <p className="font-label-md text-label-md text-on-surface-variant mt-1 flex items-center gap-1">
               <Icon name="verified" className="text-[14px] text-primary" fill /> Graded &amp; verified by Relay HUB AI
