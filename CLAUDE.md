@@ -120,7 +120,7 @@ icon fallback). Missing file → grading runs reference-less (never errors). Res
 - **Two-stage pricing**: Stage-1 (pre-grade) assumes Grade C (0.40); Stage-2 uses the real
   grade. A/B (0.85/0.65) > C → price STRUCTURALLY rises after grading (mechanical guarantee).
 - **Lifespan table** (`backend/p2p/lifespan_table.py`): 22 categories (all 20 grading-API
-  categories + baby_monitor, smartphone, backpack), each `(min, max, avg)` resale-window years.
+  categories + baby_walker, smartphone, backpack), each `(min, max, avg)` resale-window years.
 - **Time trigger**: `notifier.build_resale_nudge()` fires when age ∈ resale window;
   `simulate_years` enables demo time-travel without touching the DB.
 - **Same-town handoff**: demand matched within 12 km of the seller's station; platform fee 5%.

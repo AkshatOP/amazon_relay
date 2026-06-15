@@ -13,14 +13,14 @@ Open: http://localhost:5600
 
 ---
 
-## Demo scenario — Priya's Baby Monitor
+## Demo scenario — Priya's Baby Walker
 
 | | Value |
 |---|---|
 | User | Priya Shetty, Udupi City (576101) |
-| Item | Samsung SmartThings Baby Monitor Pro |
-| Category | baby_monitor |
-| Original price | ₹6,000 |
+| Item | Baby Walker |
+| Category | baby_walker |
+| Original price | ₹5,000 |
 | Purchase date | 2026-06-14 (today) |
 | Warranty | 5 years total |
 | simulate_years | **2.0** (peak resale window) |
@@ -32,12 +32,12 @@ Open: http://localhost:5600
 **Input:** Select purchase #1, simulate_years = 2.0
 
 **Expected output:**
-- `in_window: true` (baby_monitor window: 1.5–3.0 yr; 2.0 yr = avg → peak)
+- `in_window: true` (baby_walker window: 1.5–3.0 yr; 2.0 yr = avg → peak)
 - `age_factor = 1.0` (age ≤ avg → no penalty)
-- Stage-1 estimate: `₹6,000 × 1.0 × 0.40 (Grade C) = ₹2,400`
-- Warranty bonus: `₹6,000 × 3.0yr × 0.02 = ₹360`
-- `estimated_price = ₹2,760`
-- Message: "Hi Priya Shetty, your Samsung SmartThings Baby Monitor Pro is now 2.0 years old — perfect timing to resell! Prime resale window — best price right now..."
+- Stage-1 estimate: `₹5,000 × 1.0 × 0.40 (Grade C) = ₹2,000`
+- Warranty bonus: `₹5,000 × 3.0yr × 0.02 = ₹300`
+- `estimated_price = ₹2,300`
+- Message: "Hi Priya Shetty, your Baby Walker is now 2.0 years old — perfect timing to resell! Prime resale window — best price right now..."
 
 ---
 
@@ -46,10 +46,10 @@ Open: http://localhost:5600
 **Input:** Grade = B, score = 7, simulate_years = 2.0
 
 **Expected output:**
-- Stage-1 baseline: ₹2,760 (Grade C assumption)
-- Stage-2 calculation: `₹6,000 × 1.0 × 0.65 (Grade B) = ₹3,900` + `₹360 warranty = ₹4,260`
-- `price_went_up: true` (₹3,900 vs ₹2,400 base — Grade B > Grade C)
-- `price_delta_vs_stage1: +₹1,500` (base only, before warranty)
+- Stage-1 baseline: ₹2,300 (Grade C assumption)
+- Stage-2 calculation: `₹5,000 × 1.0 × 0.65 (Grade B) = ₹3,250` + `₹300 warranty = ₹3,550`
+- `price_went_up: true` (₹3,250 vs ₹2,000 base — Grade B > Grade C)
+- `price_delta_vs_stage1: +₹1,250` (base only, before warranty)
 - Health Card shows: Grade B badge, "transferable warranty: 3.0 yr", original bill verified
 - `listing_id: 1`
 
@@ -64,7 +64,7 @@ Open: http://localhost:5600
 **Expected output:**
 - Buyer: "Ravi Nayak (Manipal)" or "Demo Buyer (Manipal)"
 - `road_km ≈ 7.04 km` (haversine Udupi City → Manipal ≈ 5.0 km straight × 1.4 road circuity)
-- `max_budget ≈ ₹4,500` (pre-seeded) or `₹4,686` (auto-generated = asking_price × 1.10)
+- `max_budget ≈ ₹4,000` (pre-seeded) or `₹3,905` (auto-generated = asking_price × 1.10)
 - Within 12 km radius ✓
 
 ---
@@ -86,9 +86,9 @@ Open: http://localhost:5600
 **Seller earnings:**
 | | |
 |---|---|
-| Asking price | ₹4,260 |
-| Platform fee (5%) | ₹213 |
-| **Seller payout** | **₹4,047** |
+| Asking price | ₹3,550 |
+| Platform fee (5%) | ₹178 |
+| **Seller payout** | **₹3,372** |
 
 ---
 

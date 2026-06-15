@@ -40,7 +40,7 @@ LIFESPAN_YEARS: dict[str, tuple[float, float, float]] = {
     "appliance":    (3.0, 8.0, 5.0),   # kitchen/home; depends heavily on brand
 
     # --- Extra categories (not in grading API but valid P2P items) ---
-    "baby_monitor": (1.5, 3.0, 2.0),   # safety-driven; parents upgrade fast
+    "baby_walker":  (1.5, 3.0, 2.0),   # baby outgrows fast → strong used-market demand
     "smartphone":   (2.0, 3.5, 2.5),   # fast tech cycle
     "backpack":     (2.0, 4.0, 3.0),
 }

@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS catalog (
 # asin, title, category, reference_image_path (filename under backend/catalog_images/)
 CATALOG = [
     ("B0SH_UDUPI_NICHE", "Niche Artisan Shoes",                 "shoes",        "B0SH_UDUPI_NICHE.jpg"),
-    ("B0BABY_MON_01",    "Samsung SmartThings Baby Monitor Pro", "baby_monitor", "B0BABY_MON_01.jpg"),
+    ("B0BABY_WALK_01",   "Baby Walker",                          "baby_walker",  "baby_walker.jpg"),
     ("B0BP001",          "Skybags Laptop Backpack",              "backpack",     "B0BP001.jpg"),
     ("B0WT001",          "Analog Wrist Watch",                   "watch",        "B0WT001.jpg"),
     ("B0FW001",          "Running Shoes Pro",                    "footwear",     "B0FW001.jpg"),

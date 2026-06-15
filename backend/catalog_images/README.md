@@ -10,7 +10,7 @@ image for that product (resolved by `backend/grading/catalog.py`, seeded by
 | Filename | Product | Category |
 |----------|---------|----------|
 | `B0SH_UDUPI_NICHE.jpg` | Niche Artisan Shoes (the hero demo item) | shoes |
-| `B0BABY_MON_01.jpg` | Samsung SmartThings Baby Monitor Pro | baby_monitor |
+| `baby_walker.jpg` | Baby Walker | baby_walker |
 | `B0BP001.jpg` | Skybags Laptop Backpack | backpack |
 | `B0WT001.jpg` | Analog Wrist Watch | watch |
 | `B0FW001.jpg` | Running Shoes Pro | footwear |

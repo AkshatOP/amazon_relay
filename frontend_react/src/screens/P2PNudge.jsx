@@ -5,7 +5,7 @@ import { api, fmt } from "../lib/api";
 import { Icon, ProductImg, Spinner } from "../components/ui";
 import { Thinking, useThinking } from "../components/Thinking";
 
-const ICON = { baby_monitor: "baby_changing_station", shoes: "footprint", headphones: "headphones", laptop: "laptop_mac", camera: "photo_camera", watch: "watch" };
+const ICON = { baby_walker: "child_friendly", shoes: "footprint", headphones: "headphones", laptop: "laptop_mac", camera: "photo_camera", watch: "watch" };
 export const iconFor = (c) => ICON[c] || "inventory_2";
 
 export default function P2PNudge() {
@@ -21,7 +21,7 @@ export default function P2PNudge() {
     api.purchases().then((res) => {
       if (!alive) return;
       const list = (res && res.purchases) || [];
-      const p = list.find((x) => x.category === "baby_monitor") || list[0] || null;
+      const p = list.find((x) => x.category === "baby_walker") || list[0] || null;
       setP2p({ purchase: p });
       setLoading(false);
     });
@@ -61,10 +61,10 @@ export default function P2PNudge() {
       <h2 className="font-headline-md text-headline-md text-primary">P2P Exchange</h2>
       <div className="bg-surface-container-lowest border border-outline-variant rounded-lg p-stack-md flex flex-col gap-stack-sm shadow-sm">
         <div className="relative overflow-hidden h-40 bg-surface-container rounded-md flex items-center justify-center text-on-surface-variant">
-          <ProductImg asin={purchase.asin} icon={iconFor(purchase.category)} iconClass="text-[56px]" />
+          <ProductImg asin={purchase.asin} icon={iconFor(purchase.category)} iconClass="text-[56px]" fit="contain" />
         </div>
         <h3 className="font-headline-sm text-headline-sm text-on-surface mt-2">{purchase.item_name}</h3>
-        <p className="font-body-md text-body-md text-on-surface-variant">Purchased: {purchase.purchase_date} · {fmt.inr(purchase.original_price)}</p>
+        <p className="font-body-md text-body-md text-on-surface-variant">Purchased: {purchase.purchase_date} · MRP {fmt.inr(purchase.original_price)}</p>
         <div className="flex items-center gap-2 mt-2">
           <label className="font-label-md text-label-md text-on-surface-variant">Simulate years:</label>
           <input type="number" step="0.5" min="0" max="12" value={sy} onChange={(e) => setSy(parseFloat(e.target.value) || 0)}

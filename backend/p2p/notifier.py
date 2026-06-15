@@ -2,7 +2,7 @@
 
 The notifier is the ENTRY POINT of the P2P flow. It fires when:
   today - purchase_date  falls inside the category's resale window
-  (e.g. baby_monitor: 1.5 – 3.0 years from purchase)
+  (e.g. baby_walker: 1.5 – 3.0 years from purchase)
 
 'simulate_years' allows demo time-travel without altering the DB — pass 2.0 to pretend
 the purchase happened 2 years ago even if purchase_date is today.

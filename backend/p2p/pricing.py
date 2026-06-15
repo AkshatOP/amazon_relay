@@ -67,7 +67,7 @@ AGE_VALUE_FLOOR: dict[str, float] = {
     "appliance":    0.45,
 
     # --- Extra categories ---
-    "baby_monitor": 0.60,   # safety category; still works well at end of life
+    "baby_walker":  0.60,   # sturdy baby gear; still works well at end of life
     "smartphone":   0.20,   # fast tech cycle; steep drop at end of support window
     "backpack":     0.55,
 }

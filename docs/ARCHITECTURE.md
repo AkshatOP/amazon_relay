@@ -313,14 +313,14 @@ For the demo scenario: asking ₹4,260 → fee ₹213 → payout ₹4,047.
 ## P2P Lifespan table — `backend/p2p/lifespan_table.py`
 
 22 categories with tuned `(min_years, max_years, avg_years)` resale windows, aligned to the
-grading API's 20 categories plus baby_monitor, smartphone, backpack. Examples:
+grading API's 20 categories plus baby_walker, smartphone, backpack. Examples:
 
 | Category | min | max | avg | Notes |
 |----------|-----|-----|-----|-------|
 | cable | 0.5 | 2.0 | 1.0 | connector wear; shortest window |
 | clothing | 0.5 | 2.0 | 1.0 | season/fashion sensitive |
 | shoes | 1.0 | 2.0 | 1.5 | condition > age |
-| baby_monitor | 1.5 | 3.0 | 2.0 | safety-driven upgrade cycle |
+| baby_walker | 1.5 | 3.0 | 2.0 | baby outgrows fast; strong used demand |
 | laptop | 3.0 | 5.0 | 4.0 | slower tech cycle |
 | watch | 4.0 | 8.0 | 5.0 | durable; mechanical holds value |
 | book | 5.0 | 20.0 | 10.0 | edition matters more than age |

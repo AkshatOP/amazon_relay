@@ -140,7 +140,7 @@ Key numbers (simulate_years=2.0, grade B, warranty 5yr):
 
 ## ✅ Phase 5 follow-up — lifespan table aligned to grading API (DONE)
 - [x] `p2p/lifespan_table.py` — expanded from 12 to 22 categories. All 20 grading-API
-      categories now have explicit `(min, max, avg)` entries. Extras kept: baby_monitor,
+      categories now have explicit `(min, max, avg)` entries. Extras kept: baby_walker,
       smartphone, backpack.
 - [x] `p2p/pricing.py` — AGE_VALUE_FLOOR aligned to match (22 entries).
 

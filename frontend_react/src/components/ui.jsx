@@ -63,13 +63,15 @@ export function TerminalLog({ lines }) {
 }
 
 // Catalog photo for an ASIN, with icon fallback if it 404s. Parent must be relative + overflow-hidden + centered.
-export function ProductImg({ asin, icon, iconClass = "text-[36px]" }) {
+export function ProductImg({ asin, icon, iconClass = "text-[36px]", fit = "cover" }) {
   const [failed, setFailed] = useState(false);
+  // Literal class names so Tailwind generates both (no dynamic `object-${fit}`).
+  const objectFit = fit === "contain" ? "object-contain" : "object-cover";
   return (
     <>
       <Icon name={icon} className={iconClass} />
       {asin && !failed && (
-        <img src={api.catalogImageUrl(asin)} alt="" className="absolute inset-0 w-full h-full object-cover" onError={() => setFailed(true)} />
+        <img src={api.catalogImageUrl(asin)} alt="" className={`absolute inset-0 w-full h-full ${objectFit}`} onError={() => setFailed(true)} />
       )}
     </>
   );

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useApp } from "../store";
 import { Icon, ProductImg } from "../components/ui";
 
-const ELECTRONIC = new Set(["headphones", "laptop", "camera", "charger", "power_bank", "speaker", "smartphone", "baby_monitor", "appliance", "mouse", "keyboard"]);
+const ELECTRONIC = new Set(["headphones", "laptop", "camera", "charger", "power_bank", "speaker", "smartphone", "appliance", "mouse", "keyboard"]);
 
 export default function ReturnFlow() {
   const { order, go } = useApp();

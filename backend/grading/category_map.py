@@ -15,6 +15,7 @@ GRADING_PATH: dict[str, str] = {
     "bag": "visual",
     "watch": "visual",
     "baby_gear": "visual",
+    "baby_walker": "visual",
     "toy": "visual",
     "book": "visual",
     # Functional — a photo is useless; graded by weighted yes/no checks.
@@ -40,6 +41,7 @@ VISUAL_CATEGORY_LABELS: dict[str, str] = {
     "bag": "Bag / Backpack",
     "watch": "Watch",
     "baby_gear": "Baby Gear",
+    "baby_walker": "Baby Walker",
     "toy": "Toy",
     "book": "Book",
 }

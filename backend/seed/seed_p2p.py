@@ -106,9 +106,9 @@ TODAY = datetime.date.today().isoformat()
 PURCHASES = [
     # id, user_id, item_name, category, asin, original_price, purchase_date,
     # warranty_total_years, has_original_bill, has_original_box, region, station_id
-    (1, 1, "Samsung SmartThings Baby Monitor Pro",
-     "baby_monitor", "B0BABY_MON_01",
-     6000.0, TODAY, 5.0, 1, 1, "udupi", "UDUPI_CITY"),
+    (1, 1, "Baby Walker",
+     "baby_walker", "B0BABY_WALK_01",
+     5000.0, TODAY, 5.0, 1, 1, "udupi", "UDUPI_CITY"),
     (2, 2, "Nike Air Max Shoes",
      "shoes", "B0SH_UDUPI_NICHE",
      1800.0, TODAY, 1.0, 1, 0, "udupi", "MANIPAL"),
@@ -118,9 +118,9 @@ PURCHASES = [
 DEMAND = [
     # buyer_name, category, region, pincode, lat, lng, max_budget, status, note
     ("Ravi Nayak (Manipal)",
-     "baby_monitor", "udupi", "576104", 13.3502, 74.7876,
-     4500.0, "looking",
-     "Looking for a baby monitor for new baby — budget up to ₹4,500"),
+     "baby_walker", "udupi", "576104", 13.3502, 74.7876,
+     4000.0, "looking",
+     "Looking for a baby walker for new baby — budget up to ₹4,000"),
 ]
 
 

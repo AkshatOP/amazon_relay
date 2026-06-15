@@ -135,7 +135,7 @@ approaching end of useful life. The flow:
 
 ### Time trigger
 The system monitors purchase history. When `today − purchase_date` enters the category's
-resale window (e.g. baby_monitor: 1.5–3.0 years), a nudge notification fires automatically.
+resale window (e.g. baby_walker: 1.5–3.0 years), a nudge notification fires automatically.
 
 ### Two-stage pricing
 **Stage 1 (pre-grade):** conservative estimate assuming Grade C condition.
@@ -155,7 +155,7 @@ the price — this is a mechanical guarantee, not a marketing claim.
 
 ### Lifespan table
 22 categories are covered, aligned to the grading API's 19 categories plus 3 extras
-(baby_monitor, smartphone, backpack). Each has `(min_years, max_years, avg_years)` tuned to
+(baby_walker, smartphone, backpack). Each has `(min_years, max_years, avg_years)` tuned to
 market resale behaviour (e.g. cable: 0.5–2.0 yr; watch: 4.0–8.0 yr; book: 5.0–20.0 yr).
 
 ### Same-town handoff
